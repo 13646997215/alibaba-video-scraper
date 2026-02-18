@@ -183,29 +183,31 @@ body {
 }
 
 /* 视频列表 */
-.videos-section,
-.downloads-section {
+.videos-section {
     margin-bottom: 40px;
 }
 
-.videos-section h2,
-.downloads-section h2 {
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
+.videos-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 20px;
     padding-bottom: 10px;
     border-bottom: 2px solid #f0f0f0;
 }
 
-.videos-list,
-.downloads-list {
+.videos-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+.videos-list {
     display: grid;
     gap: 12px;
 }
 
-.video-item,
-.download-item {
+.video-item {
     background: #f8f9fa;
     padding: 16px;
     border-radius: 8px;
@@ -216,45 +218,32 @@ body {
     border: 1px solid #e0e0e0;
 }
 
-.video-item:hover,
-.download-item:hover {
+.video-item:hover {
     background: #f0f0f0;
     border-color: #667eea;
 }
 
-.video-info,
-.download-info {
+.video-info {
     flex: 1;
 }
 
-.video-title,
-.download-name {
+.video-title {
     font-weight: 600;
     color: #333;
     margin-bottom: 4px;
-    word-break: break-all;
 }
 
-.video-url,
-.download-size {
+.video-url {
     font-size: 12px;
     color: #999;
     font-family: 'Courier New', monospace;
     word-break: break-all;
 }
 
-.video-actions,
-.download-actions {
+.video-actions {
     display: flex;
     gap: 8px;
     margin-left: 16px;
-}
-
-.empty-message {
-    text-align: center;
-    color: #999;
-    padding: 30px;
-    font-size: 14px;
 }
 
 /* 页脚 */
@@ -265,17 +254,6 @@ body {
     border-top: 1px solid #e0e0e0;
     font-size: 12px;
     color: #666;
-}
-
-.footer code {
-    background: #e0e0e0;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: 'Courier New', monospace;
-}
-
-.footer p {
-    margin: 5px 0;
 }
 
 /* 动画 */
@@ -310,21 +288,28 @@ body {
         width: 100%;
     }
 
-    .video-item,
-    .download-item {
+    .videos-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .videos-header .btn-primary {
+        width: 100%;
+    }
+
+    .video-item {
         flex-direction: column;
         align-items: flex-start;
     }
 
-    .video-actions,
-    .download-actions {
+    .video-actions {
         margin-left: 0;
         margin-top: 12px;
         width: 100%;
     }
 
-    .video-actions button,
-    .download-actions button {
+    .video-actions button {
         flex: 1;
     }
 }

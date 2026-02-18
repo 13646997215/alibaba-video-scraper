@@ -1,6 +1,5 @@
 const API_BASE = "/api";
 
-// DOM 元素
 const urlInput = document.getElementById("urlInput");
 const scrapeBtn = document.getElementById("scrapeBtn");
 const statusSection = document.getElementById("statusSection");
@@ -11,33 +10,145 @@ const statusMessage = document.getElementById("statusMessage");
 const videosSection = document.getElementById("videosSection");
 const videosList = document.getElementById("videosList");
 const downloadAllBtn = document.getElementById("downloadAllBtn");
+const videoCountPill = document.getElementById("videoCountPill");
 
 let currentVideos = [];
 
-// 事件监听
 scrapeBtn.addEventListener("click", handleScrape);
 downloadAllBtn.addEventListener("click", handlePackageDownload);
-urlInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") handleScrape();
+urlInput.addEventListener("keypress", (event) => {
+  if (event.key === "Enter") {
+    handleScrape();
+  }
 });
 
-// 爬取视频
+function showToast(message) {
+  window.alert(message);
+}
+
+function setSectionVisible(element, visible) {
+  element.hidden = !visible;
+}
+
+function updateStatus(type, icon, title, message, progress) {
+  statusSection.classList.remove("status-success", "status-error");
+  if (type === "success") {
+    statusSection.classList.add("status-success");
+  }
+  if (type === "error") {
+    statusSection.classList.add("status-error");
+  }
+
+  statusIcon.textContent = icon;
+  statusText.textContent = title;
+  statusMessage.textContent = message;
+  progressFill.style.width = `${Math.max(0, Math.min(progress, 100))}%`;
+  setSectionVisible(statusSection, true);
+}
+
+function ensureValidUrl(url) {
+  if (!url) {
+    return false;
+  }
+  return /alibaba\.com|1688\.com/i.test(url);
+}
+
+function buildVideoRow(videoUrl, index) {
+  const item = document.createElement("div");
+  item.className = "video-item";
+
+  const info = document.createElement("div");
+  info.className = "video-info";
+
+  const title = document.createElement("div");
+  title.className = "video-title";
+  title.textContent = `视频 ${index + 1}`;
+
+  const urlText = document.createElement("div");
+  urlText.className = "video-url";
+  urlText.textContent = videoUrl;
+  urlText.title = videoUrl;
+
+  info.appendChild(title);
+  info.appendChild(urlText);
+
+  const actions = document.createElement("div");
+  actions.className = "video-actions";
+
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "btn btn-soft";
+  copyBtn.textContent = "复制链接";
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(videoUrl);
+      showToast("✓ 已复制链接");
+    } catch {
+      showToast("✗ 复制失败，请手动复制");
+    }
+  });
+
+  const downloadBtn = document.createElement("button");
+  downloadBtn.className = "btn btn-primary";
+  downloadBtn.textContent = "下载";
+  downloadBtn.addEventListener("click", () => {
+    window.open(videoUrl, "_blank", "noopener,noreferrer");
+  });
+
+  actions.appendChild(copyBtn);
+  actions.appendChild(downloadBtn);
+
+  item.appendChild(info);
+  item.appendChild(actions);
+
+  return item;
+}
+
+function renderVideos(videos) {
+  videosList.innerHTML = "";
+
+  videos.forEach((videoUrl, index) => {
+    videosList.appendChild(buildVideoRow(videoUrl, index));
+  });
+
+  videoCountPill.textContent = `${videos.length} 个视频`;
+  setSectionVisible(videosSection, videos.length > 0);
+  setSectionVisible(downloadAllBtn, videos.length > 0);
+}
+
+async function requestJson(url, options) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message = data.error || data.message || "请求失败";
+    throw new Error(message);
+  }
+
+  return data;
+}
+
 async function handleScrape() {
   const url = urlInput.value.trim();
 
   if (!url) {
-    alert("请输入商品页面 URL");
+    showToast("请输入商品页面 URL");
+    return;
+  }
+
+  if (!ensureValidUrl(url)) {
+    showToast("请粘贴阿里巴巴或 1688 商品链接");
     return;
   }
 
   scrapeBtn.disabled = true;
-  statusSection.style.display = "block";
-  videosSection.style.display = "none";
+  setSectionVisible(videosSection, false);
+  setSectionVisible(downloadAllBtn, false);
+  currentVideos = [];
 
-  updateStatus("scraping", "⏳", "正在爬取...", "正在获取页面...", 0);
+  updateStatus("loading", "⏳", "正在爬取", "正在抓取并解析页面视频资源...", 28);
 
   try {
-    const response = await fetch(`${API_BASE}/scrape`, {
+    const data = await requestJson(`${API_BASE}/scrape`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -45,49 +156,36 @@ async function handleScrape() {
       body: JSON.stringify({ url }),
     });
 
-    const data = await response.json();
+    const videos = Array.isArray(data.videos) ? data.videos : [];
+    currentVideos = videos;
+    renderVideos(videos);
 
-    if (data.status === "success") {
-      currentVideos = data.videos;
-      updateStatus(
-        "completed",
-        "✓",
-        "爬取完成",
-        `找到 ${data.videos.length} 个视频`,
-        100,
-      );
-      displayVideos(data.videos);
-      videosSection.style.display = "block";
-    } else {
-      updateStatus("error", "✗", "爬取失败", data.error || data.message, 0);
-    }
+    updateStatus(
+      "success",
+      "✓",
+      "解析完成",
+      `找到 ${videos.length} 个视频，点击右下角可一键打包下载。`,
+      100,
+    );
   } catch (error) {
-    updateStatus("error", "✗", "爬取失败", `错误: ${error.message}`, 0);
+    updateStatus("error", "✗", "爬取失败", error.message, 0);
   } finally {
     scrapeBtn.disabled = false;
   }
 }
 
-// 打包下载所有视频
 async function handlePackageDownload() {
   if (currentVideos.length === 0) {
-    alert("没有可下载的视频");
+    showToast("没有可打包的视频");
     return;
   }
 
   downloadAllBtn.disabled = true;
-  downloadAllBtn.textContent = "⏳ 打包中...";
-
-  updateStatus(
-    "scraping",
-    "⏳",
-    "正在打包...",
-    "正在下载并打包视频，请稍候...",
-    50,
-  );
+  downloadAllBtn.textContent = "⏳ 正在打包...";
+  updateStatus("loading", "⏳", "正在打包", "服务器正在下载并压缩视频，请稍候...", 60);
 
   try {
-    const response = await fetch(`${API_BASE}/package`, {
+    const data = await requestJson(`${API_BASE}/package`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -95,92 +193,24 @@ async function handlePackageDownload() {
       body: JSON.stringify({ videos: currentVideos }),
     });
 
-    const data = await response.json();
-
-    if (data.status === "success") {
-      // 下载 ZIP 文件
-      const link = document.createElement("a");
-      link.href = "data:application/zip;base64," + data.zip_data;
-      link.download = data.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      updateStatus("completed", "✓", "打包完成", "视频已打包下载", 100);
-      alert("✓ 视频已打包下载，请检查浏览器下载文件夹");
-    } else {
-      updateStatus("error", "✗", "打包失败", data.error, 0);
-      alert("✗ " + data.error);
+    if (!data.zip_data) {
+      throw new Error("未生成可下载压缩包");
     }
+
+    const link = document.createElement("a");
+    link.href = `data:application/zip;base64,${data.zip_data}`;
+    link.download = data.filename || "alibaba_videos.zip";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    updateStatus("success", "✓", "打包完成", data.message || "压缩包下载已开始", 100);
+    showToast("✓ ZIP 下载已开始，请查看浏览器下载列表");
   } catch (error) {
     updateStatus("error", "✗", "打包失败", error.message, 0);
-    alert("✗ 打包失败: " + error.message);
+    showToast(`✗ ${error.message}`);
   } finally {
     downloadAllBtn.disabled = false;
     downloadAllBtn.textContent = "📦 打包下载全部";
   }
-}
-
-// 下载单个视频
-function downloadVideo(url, index) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `video_${index + 1}.mp4`;
-  a.target = "_blank";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  alert("✓ 视频下载已开始");
-}
-
-// 复制 URL
-function copyUrl(url) {
-  navigator.clipboard
-    .writeText(url)
-    .then(() => {
-      alert("✓ URL 已复制到剪贴板");
-    })
-    .catch(() => {
-      const textarea = document.createElement("textarea");
-      textarea.value = url;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-      alert("✓ URL 已复制到剪贴板");
-    });
-}
-
-// 更新状态
-function updateStatus(status, icon, text, message, progress) {
-  statusIcon.textContent = icon;
-  statusText.textContent = text;
-  statusMessage.textContent = message;
-  progressFill.style.width = progress + "%";
-
-  if (status === "completed") {
-    statusIcon.style.animation = "none";
-  } else if (status === "error") {
-    statusIcon.style.animation = "none";
-  }
-}
-
-// 显示视频列表
-function displayVideos(videos) {
-  videosList.innerHTML = videos
-    .map(
-      (url, index) => `
-        <div class="video-item">
-            <div class="video-info">
-                <div class="video-title">视频 ${index + 1}</div>
-                <div class="video-url" title="${url}">${url.substring(0, 60)}...</div>
-            </div>
-            <div class="video-actions">
-                <button class="btn btn-secondary" onclick="copyUrl('${url.replace(/'/g, "\\'")}')">复制</button>
-                <button class="btn btn-primary" onclick="downloadVideo('${url.replace(/'/g, "\\'")}', ${index})">下载</button>
-            </div>
-        </div>
-    `,
-    )
-    .join("");
 }

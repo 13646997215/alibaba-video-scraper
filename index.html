@@ -35,7 +35,9 @@
             <button id="checkApiBtn" class="btn btn-soft" type="button">
               检测 API
             </button>
-            <a class="btn btn-soft nav-link" href="diagnostics.html">诊断中心</a>
+            <a class="btn btn-soft nav-link" href="diagnostics.html"
+              >诊断中心</a
+            >
             <a class="btn btn-soft nav-link" href="help.html">使用帮助</a>
           </div>
         </header>
@@ -138,12 +140,20 @@
         </section>
 
         <section class="card" id="browserAssistCard">
-          <div class="videos-header" style="margin-bottom: 10px; padding-bottom: 10px">
+          <div
+            class="videos-header"
+            style="margin-bottom: 10px; padding-bottom: 10px"
+          >
             <h2>浏览器辅助解析</h2>
             <span class="count-pill">无需后端抓取</span>
           </div>
           <p class="helper-text">
-            当线上接口提示 <strong>ANTI_BOT_BLOCKED</strong> 时，可在浏览器打开商品页，按 <strong>Ctrl+U</strong> 查看源代码并全选复制，粘贴到下方即可解析。
+            当线上接口提示
+            <strong>ANTI_BOT_BLOCKED</strong> 时，可在浏览器打开商品页，按
+            <strong>Ctrl+U</strong> 查看源代码并全选复制，粘贴到下方即可解析。
+             也可直接使用
+             <a class="nav-link" href="help.html#bookmarklet">一键书签脚本</a>
+             自动导入。
           </p>
           <textarea
             id="htmlPasteInput"
@@ -152,8 +162,16 @@
             placeholder="在这里粘贴商品页 HTML 源代码（Ctrl+A 全选 -> Ctrl+C 复制）..."
           ></textarea>
           <div class="quick-actions" style="margin-top: 10px">
-            <button id="parseHtmlBtn" class="btn btn-primary" type="button">解析粘贴的 HTML</button>
-            <button id="clearHtmlBtn" class="btn btn-soft" type="button">清空 HTML</button>
+            <button id="parseHtmlBtn" class="btn btn-primary" type="button">
+              解析粘贴的 HTML
+            </button>
+            <button id="importHtmlBtn" class="btn btn-soft" type="button">
+              导入HTML文件
+            </button>
+            <input id="htmlFileInput" type="file" accept="text/html,.html" hidden />
+            <button id="clearHtmlBtn" class="btn btn-soft" type="button">
+              清空 HTML
+            </button>
           </div>
         </section>
 

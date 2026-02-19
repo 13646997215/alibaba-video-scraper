@@ -29,8 +29,11 @@ const removeInvalidBtn = document.getElementById("removeInvalidBtn");
 const themeSelect = document.getElementById("themeSelect");
 const checkApiBtn = document.getElementById("checkApiBtn");
 const inputMeta = document.getElementById("inputMeta");
+const browserAssistCard = document.getElementById("browserAssistCard");
 const htmlPasteInput = document.getElementById("htmlPasteInput");
 const parseHtmlBtn = document.getElementById("parseHtmlBtn");
+const importHtmlBtn = document.getElementById("importHtmlBtn");
+const htmlFileInput = document.getElementById("htmlFileInput");
 const clearHtmlBtn = document.getElementById("clearHtmlBtn");
 
 const historyTabs = document.getElementById("historyTabs");
@@ -167,15 +170,54 @@ parseHtmlBtn.addEventListener("click", () => {
   };
   renderItems();
   if (!currentItems.length) {
-    updateStatus("error", "⚠", "未找到资源", "HTML 中未匹配到可识别的资源链接", 100);
+    updateStatus(
+      "error",
+      "⚠",
+      "未找到资源",
+      "HTML 中未匹配到可识别的资源链接",
+      100,
+    );
     return;
   }
-  updateStatus("success", "✓", "解析完成", `从 HTML 提取到 ${currentItems.length} 个资源`, 100);
+  updateStatus(
+    "success",
+    "✓",
+    "解析完成",
+    `从 HTML 提取到 ${currentItems.length} 个资源`,
+    100,
+  );
 });
 
 clearHtmlBtn.addEventListener("click", () => {
   htmlPasteInput.value = "";
   showToast("✓ 已清空");
+});
+
+importHtmlBtn.addEventListener("click", () => htmlFileInput.click());
+
+htmlFileInput.addEventListener("change", () => {
+  const file = htmlFileInput.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    htmlPasteInput.value = String(reader.result || "");
+    showToast("✓ HTML 文件已导入");
+  };
+  reader.readAsText(file, "utf-8");
+  htmlFileInput.value = "";
+});
+
+window.addEventListener("message", (event) => {
+  const payload = event.data;
+  if (!payload || payload.type !== "IMPORT_HTML") return;
+  if (typeof payload.html !== "string") return;
+  const html = payload.html.slice(0, 4_000_000);
+  htmlPasteInput.value = html;
+  if (typeof payload.url === "string" && payload.url.trim()) {
+    urlInput.value = payload.url.trim();
+  }
+  showToast("✓ 已接收页面HTML，正在自动解析");
+  parseHtmlBtn.click();
 });
 
 themeSelect.addEventListener("change", () => {
@@ -301,9 +343,37 @@ syncModeUi();
 bootstrapRuntimeDiagnostics();
 renderHistoryTabs();
 updateInputMeta();
+consumeBootstrapImport();
 
 function showToast(message) {
   window.alert(message);
+}
+
+function consumeBootstrapImport() {
+  const params = new URLSearchParams(window.location.search);
+  const htmlParam = params.get("html");
+  const urlParam = params.get("url");
+  const hash = window.location.hash || "";
+  const hashMatch = hash.startsWith("#html=") ? hash.slice(6) : "";
+  const packed = htmlParam || hashMatch;
+  if (!packed) return;
+
+  try {
+    const decoded = decodeURIComponent(packed);
+    const html = decodeBase64Utf8(decoded);
+    if (urlParam) urlInput.value = urlParam;
+    htmlPasteInput.value = html;
+    parseHtmlBtn.click();
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } catch {
+    // ignore
+  }
+}
+
+function decodeBase64Utf8(base64Text) {
+  const binary = atob(base64Text);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return new TextDecoder("utf-8").decode(bytes);
 }
 
 function setSectionVisible(element, visible) {
@@ -693,9 +763,16 @@ function parseResourcesFromHtml(html) {
     const lower = normalized.toLowerCase();
     let type = "other";
     if (/(\.mp4|\.webm|\.ogg|\.mov|\.m3u8)(\?|$)/.test(lower)) type = "video";
-    else if (/(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.svg|\.avif)(\?|$)/.test(lower)) type = "image";
-    else if (/(\.mp3|\.wav|\.m4a|\.aac|\.flac)(\?|$)/.test(lower)) type = "audio";
-    else if (/(\.pdf|\.docx?|\.xlsx?|\.pptx?|\.zip|\.rar|\.7z|\.csv|\.json|\.txt)(\?|$)/.test(lower)) type = "file";
+    else if (/(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.svg|\.avif)(\?|$)/.test(lower))
+      type = "image";
+    else if (/(\.mp3|\.wav|\.m4a|\.aac|\.flac)(\?|$)/.test(lower))
+      type = "audio";
+    else if (
+      /(\.pdf|\.docx?|\.xlsx?|\.pptx?|\.zip|\.rar|\.7z|\.csv|\.json|\.txt)(\?|$)/.test(
+        lower,
+      )
+    )
+      type = "file";
 
     const key = `${type}::${normalized}`;
     if (dedupeToggle.checked && seen.has(key)) return;
@@ -863,7 +940,11 @@ async function requestJson(url, options = {}, timeoutMs = 30000) {
   clearTimeout(timer);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error || data.message || "请求失败");
+    const err = new Error(data.error || data.message || "请求失败");
+    err.status = response.status;
+    err.code = data.code || "";
+    err.details = data;
+    throw err;
   }
   return data;
 }
@@ -967,7 +1048,12 @@ async function scrapeUrls(urls) {
         }
       });
     } catch (error) {
-      failed.push({ url, reason: error.message });
+      failed.push({
+        url,
+        reason: error.message,
+        status: error.status || 0,
+        code: error.code || "",
+      });
     }
   }
 
@@ -1002,6 +1088,19 @@ async function handleScrape() {
     renderItems();
 
     if (currentItems.length === 0) {
+      const antiBotCount = failed.filter((item) => item.code === "ANTI_BOT_BLOCKED").length;
+      if (antiBotCount > 0) {
+        updateStatus(
+          "error",
+          "⚠",
+          "检测到反爬校验",
+          `有 ${antiBotCount} 个链接被目标站拦截。请使用下方“浏览器辅助解析”（可用书签脚本或导入HTML文件）。`,
+          100,
+        );
+        browserAssistCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+
       const message = failed.length
         ? `全部链接处理失败（${failed.length}/${urls.length}），请检查网络或目标页面可访问性`
         : "页面可访问但未提取到可下载资源";

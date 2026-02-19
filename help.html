@@ -15,14 +15,19 @@
           <p>针对 Vercel / 本地差异、反爬限制、导出与筛选提供完整指南。</p>
           <div class="hero-tools">
             <a class="btn btn-soft nav-link" href="index.html">返回主页面</a>
-            <a class="btn btn-soft nav-link" href="diagnostics.html">打开诊断中心</a>
+            <a class="btn btn-soft nav-link" href="diagnostics.html"
+              >打开诊断中心</a
+            >
           </div>
         </header>
 
         <section class="card">
           <h2 class="status-text">快速结论</h2>
           <p class="helper-text">
-            如果 <strong>health 正常</strong> 但 <strong>scrape 失败</strong>，通常是目标站返回了反爬校验页（Captcha/Punish），不是你的前端或 API 路由坏掉。
+            如果 <strong>health 正常</strong> 但
+            <strong>scrape 失败</strong
+            >，通常是目标站返回了反爬校验页（Captcha/Punish），不是你的前端或
+            API 路由坏掉。
           </p>
         </section>
 
@@ -36,7 +41,34 @@
             <li>将诊断结果复制给维护者进一步分析。</li>
           </ol>
         </section>
+
+        <section class="card" id="bookmarklet">
+          <h2 class="status-text">一键书签脚本（推荐）</h2>
+          <p class="helper-text">
+            在目标商品页点击该书签脚本，可自动把当前页面 HTML 发送到本工具并直接解析。
+          </p>
+          <div class="quick-actions">
+            <button id="copyBookmarkletBtn" class="btn btn-primary" type="button">复制书签脚本</button>
+            <a class="btn btn-soft nav-link" href="index.html">返回主页面执行导入</a>
+          </div>
+          <pre id="bookmarkletCode" class="diag-output"></pre>
+        </section>
       </main>
     </div>
+
+    <script>
+      const bookmarkletCode = document.getElementById('bookmarkletCode');
+      const copyBookmarkletBtn = document.getElementById('copyBookmarkletBtn');
+      const script = `javascript:(function(){try{var tool='https://alibaba-video-scraper.vercel.app/';var w=window.open(tool,'_blank');var payload={type:'IMPORT_HTML',html:document.documentElement.outerHTML,url:location.href};setTimeout(function(){if(w){w.postMessage(payload,'*');}},1200);}catch(e){alert('导入失败: '+e.message);}})();`;
+      bookmarkletCode.textContent = script;
+      copyBookmarkletBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(script);
+          alert('已复制书签脚本。请新建浏览器书签并粘贴到 URL。');
+        } catch {
+          alert('复制失败，请手动复制下面代码');
+        }
+      });
+    </script>
   </body>
 </html>

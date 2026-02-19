@@ -3,7 +3,9 @@ function resolveApiBase() {
   const customApi = params.get("api");
   if (customApi) return customApi.replace(/\/$/, "");
   if (window.location.protocol === "file:") return "http://127.0.0.1:5000/api";
-  const isLocalHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+  const isLocalHost = ["127.0.0.1", "localhost"].includes(
+    window.location.hostname,
+  );
   if (isLocalHost && window.location.port && window.location.port !== "5000") {
     return "http://127.0.0.1:5000/api";
   }
@@ -12,15 +14,33 @@ function resolveApiBase() {
 
 let API_BASE = resolveApiBase();
 const STORAGE_KEY = "alibaba_video_scraper_recent_urls";
+const STORAGE_HISTORY_KEY = "alibaba_video_scraper_history_tabs";
 const STORAGE_THEME_KEY = "alibaba_video_scraper_theme";
+const STORAGE_PREFS_KEY = "alibaba_video_scraper_prefs";
 
 const urlInput = document.getElementById("urlInput");
 const scrapeBtn = document.getElementById("scrapeBtn");
 const clearUrlBtn = document.getElementById("clearUrlBtn");
 const pasteUrlBtn = document.getElementById("pasteUrlBtn");
 const sampleUrlBtn = document.getElementById("sampleUrlBtn");
+const formatUrlsBtn = document.getElementById("formatUrlsBtn");
+const copyInputBtn = document.getElementById("copyInputBtn");
+const removeInvalidBtn = document.getElementById("removeInvalidBtn");
 const themeSelect = document.getElementById("themeSelect");
 const checkApiBtn = document.getElementById("checkApiBtn");
+const inputMeta = document.getElementById("inputMeta");
+
+const historyTabs = document.getElementById("historyTabs");
+const historySearchInput = document.getElementById("historySearchInput");
+const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+const exportHistoryBtn = document.getElementById("exportHistoryBtn");
+const importHistoryBtn = document.getElementById("importHistoryBtn");
+const importHistoryInput = document.getElementById("importHistoryInput");
+const historyLabelInput = document.getElementById("historyLabelInput");
+const historyNoteInput = document.getElementById("historyNoteInput");
+const saveHistoryMetaBtn = document.getElementById("saveHistoryMetaBtn");
+const pinHistoryBtn = document.getElementById("pinHistoryBtn");
+const deleteHistoryBtn = document.getElementById("deleteHistoryBtn");
 
 const statusSection = document.getElementById("statusSection");
 const statusIcon = document.getElementById("statusIcon");
@@ -34,8 +54,16 @@ const downloadAllBtn = document.getElementById("downloadAllBtn");
 const downloadSelectedBtn = document.getElementById("downloadSelectedBtn");
 const videoCountPill = document.getElementById("videoCountPill");
 const runtimeHint = document.getElementById("runtimeHint");
-const recentUrls = document.getElementById("recentUrls");
 const filterInput = document.getElementById("filterInput");
+const domainFilterInput = document.getElementById("domainFilterInput");
+const maxResultsInput = document.getElementById("maxResultsInput");
+const selectedOnlyToggle = document.getElementById("selectedOnlyToggle");
+const dedupeToggle = document.getElementById("dedupeToggle");
+const retryFailedBtn = document.getElementById("retryFailedBtn");
+const typeAllBtn = document.getElementById("typeAllBtn");
+const typeNoneBtn = document.getElementById("typeNoneBtn");
+const typeFilterPanel = document.getElementById("typeFilterPanel");
+const typeFilterCheckboxes = Array.from(document.querySelectorAll(".type-filter"));
 const modeSelect = document.getElementById("modeSelect");
 const sortSelect = document.getElementById("sortSelect");
 const selectAllBtn = document.getElementById("selectAllBtn");
@@ -43,8 +71,11 @@ const invertSelectBtn = document.getElementById("invertSelectBtn");
 const deselectAllBtn = document.getElementById("deselectAllBtn");
 const copyAllBtn = document.getElementById("copyAllBtn");
 const copySelectedBtn = document.getElementById("copySelectedBtn");
+const copyFailedBtn = document.getElementById("copyFailedBtn");
+const openSelectedBtn = document.getElementById("openSelectedBtn");
 const exportJsonBtn = document.getElementById("exportJsonBtn");
 const exportTxtBtn = document.getElementById("exportTxtBtn");
+const exportCsvBtn = document.getElementById("exportCsvBtn");
 const resultStats = document.getElementById("resultStats");
 const resourceTypeStats = document.getElementById("resourceTypeStats");
 
@@ -55,10 +86,15 @@ const closePreviewBtn = document.getElementById("closePreviewBtn");
 
 let currentItems = [];
 let lastSummary = { time: "-", title: "", counts: {} };
+let historyTabsData = [];
+let activeHistoryId = "";
+let lastFailedUrls = [];
 
 scrapeBtn.addEventListener("click", handleScrape);
 downloadAllBtn.addEventListener("click", () => handlePackageDownload(false));
-downloadSelectedBtn.addEventListener("click", () => handlePackageDownload(true));
+downloadSelectedBtn.addEventListener("click", () =>
+  handlePackageDownload(true),
+);
 clearUrlBtn.addEventListener("click", () => {
   urlInput.value = "";
   urlInput.focus();
@@ -74,7 +110,42 @@ pasteUrlBtn.addEventListener("click", async () => {
 });
 
 sampleUrlBtn.addEventListener("click", () => {
-  urlInput.value = "https://www.alibaba.com/product-detail/Custom-Wholesale-Metal-Rimless-Sunglasses-wi_1601333000000.html";
+  urlInput.value =
+    "https://www.alibaba.com/product-detail/Custom-Wholesale-Metal-Rimless-Sunglasses-wi_1601333000000.html";
+});
+
+formatUrlsBtn.addEventListener("click", () => {
+  const urls = parseInputUrls(urlInput.value);
+  if (!urls.length) {
+    showToast("没有可格式化的有效链接");
+    return;
+  }
+  urlInput.value = urls.join("\n");
+  showToast(`✓ 已格式化 ${urls.length} 个链接`);
+});
+
+copyInputBtn.addEventListener("click", () => {
+  const value = urlInput.value.trim();
+  if (!value) {
+    showToast("当前输入为空");
+    return;
+  }
+  copyText(value);
+});
+
+removeInvalidBtn.addEventListener("click", () => {
+  const raw = (urlInput.value || "").trim();
+  if (!raw) {
+    showToast("当前输入为空");
+    return;
+  }
+  const tokens = raw.split(/[\n,;\s]+/).filter(Boolean);
+  const valid = tokens
+    .map((item) => sanitizeUrl(item))
+    .filter((item) => ensureValidUrl(item));
+  urlInput.value = [...new Set(valid)].join("\n");
+  updateInputMeta();
+  showToast(`✓ 已保留 ${valid.length} 个有效链接`);
 });
 
 themeSelect.addEventListener("change", () => {
@@ -82,19 +153,64 @@ themeSelect.addEventListener("change", () => {
 });
 
 checkApiBtn.addEventListener("click", () => {
-  bootstrapRuntimeDiagnostics(true);
+  bootstrapRuntimeDiagnostics(true).then(async () => {
+    const firstUrl = parseInputUrls(urlInput.value)[0];
+    if (!firstUrl) return;
+    try {
+      const diag = await requestJson(`${API_BASE}/diag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: firstUrl }),
+      });
+      if (diag?.status_code) {
+        showToast(`✓ 目标诊断成功：HTTP ${diag.status_code}`);
+      }
+    } catch {
+      // 忽略诊断失败，仅保留健康检查提示
+    }
+  });
 });
 
 urlInput.addEventListener("keypress", (event) => {
   if (event.key === "Enter") handleScrape();
 });
 
+urlInput.addEventListener("input", updateInputMeta);
+
 window.addEventListener("keydown", (event) => {
   if (event.ctrlKey && event.key === "Enter") handleScrape();
 });
 
 filterInput.addEventListener("input", renderItems);
+domainFilterInput.addEventListener("input", renderItems);
+maxResultsInput.addEventListener("input", renderItems);
+selectedOnlyToggle.addEventListener("change", renderItems);
+typeFilterCheckboxes.forEach((checkbox) =>
+  checkbox.addEventListener("change", renderItems),
+);
+
+typeAllBtn.addEventListener("click", () => {
+  typeFilterCheckboxes.forEach((checkbox) => (checkbox.checked = true));
+  renderItems();
+});
+
+typeNoneBtn.addEventListener("click", () => {
+  typeFilterCheckboxes.forEach((checkbox) => (checkbox.checked = false));
+  renderItems();
+});
+
+retryFailedBtn.addEventListener("click", retryFailedUrls);
+
+historySearchInput.addEventListener("input", renderHistoryTabs);
+clearHistoryBtn.addEventListener("click", clearHistoryTabs);
+exportHistoryBtn.addEventListener("click", exportHistoryTabs);
+importHistoryBtn.addEventListener("click", () => importHistoryInput.click());
+importHistoryInput.addEventListener("change", importHistoryTabs);
+saveHistoryMetaBtn.addEventListener("click", saveActiveHistoryMeta);
+pinHistoryBtn.addEventListener("click", toggleActiveHistoryPin);
+deleteHistoryBtn.addEventListener("click", deleteActiveHistory);
 modeSelect.addEventListener("change", () => {
+  syncModeUi();
   setSectionVisible(videosSection, false);
   currentItems = [];
   renderItems();
@@ -122,8 +238,26 @@ deselectAllBtn.addEventListener("click", () => {
 
 copyAllBtn.addEventListener("click", () => copyLinks(currentItems));
 copySelectedBtn.addEventListener("click", () => copyLinks(selectedItems()));
+copyFailedBtn.addEventListener("click", () => {
+  if (!lastFailedUrls.length) {
+    showToast("当前没有失败链接");
+    return;
+  }
+  copyText(lastFailedUrls.join("\n"));
+});
+openSelectedBtn.addEventListener("click", () => {
+  const selected = selectedItems();
+  if (!selected.length) {
+    showToast("请先勾选资源");
+    return;
+  }
+  selected.slice(0, 12).forEach((item) => {
+    window.open(item.url, "_blank", "noopener,noreferrer");
+  });
+});
 exportJsonBtn.addEventListener("click", exportJsonReport);
 exportTxtBtn.addEventListener("click", exportTxtReport);
+exportCsvBtn.addEventListener("click", exportCsvReport);
 closePreviewBtn.addEventListener("click", closePreview);
 previewModal.addEventListener("click", (event) => {
   if (event.target === previewModal) closePreview();
@@ -131,8 +265,12 @@ previewModal.addEventListener("click", (event) => {
 
 setSectionVisible(previewModal, false);
 initTheme();
+loadUserPrefs();
+loadHistoryTabs();
+syncModeUi();
 bootstrapRuntimeDiagnostics();
-renderRecentUrls();
+renderHistoryTabs();
+updateInputMeta();
 
 function showToast(message) {
   window.alert(message);
@@ -140,6 +278,10 @@ function showToast(message) {
 
 function setSectionVisible(element, visible) {
   element.hidden = !visible;
+}
+
+function syncModeUi() {
+  setSectionVisible(typeFilterPanel, modeSelect.value === "all");
 }
 
 function initTheme() {
@@ -153,6 +295,20 @@ function initTheme() {
 function applyTheme(theme, persist = true) {
   document.documentElement.setAttribute("data-theme", theme);
   if (persist) localStorage.setItem(STORAGE_THEME_KEY, theme);
+}
+
+function updateInputMeta() {
+  const raw = (urlInput.value || "").trim();
+  if (!raw) {
+    inputMeta.textContent = "";
+    return;
+  }
+  const tokens = raw.split(/[\n,;\s]+/).filter(Boolean);
+  let validCount = 0;
+  tokens.forEach((token) => {
+    if (ensureValidUrl(sanitizeUrl(token))) validCount += 1;
+  });
+  inputMeta.textContent = ` · 输入 ${tokens.length} 项，合法 ${validCount} 项`;
 }
 
 function updateStatus(type, icon, title, message, progress) {
@@ -201,29 +357,242 @@ function getRecentUrls() {
   }
 }
 
-function saveRecentUrl(url) {
-  const list = getRecentUrls().filter((item) => item !== url);
-  list.unshift(url);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 8)));
-  renderRecentUrls();
+function saveUserPrefs() {
+  const payload = {
+    selectedOnly: selectedOnlyToggle.checked,
+    dedupe: dedupeToggle.checked,
+    maxResults: maxResultsInput.value,
+    domainFilter: domainFilterInput.value,
+    typeFilters: typeFilterCheckboxes
+      .filter((item) => item.checked)
+      .map((item) => item.value),
+  };
+  localStorage.setItem(STORAGE_PREFS_KEY, JSON.stringify(payload));
 }
 
-function renderRecentUrls() {
-  const list = getRecentUrls();
-  recentUrls.innerHTML = "";
-  setSectionVisible(recentUrls, list.length > 0);
-  list.forEach((url) => {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "recent-chip";
-    chip.textContent = url;
-    chip.title = url;
-    chip.addEventListener("click", () => {
-      urlInput.value = url;
-      urlInput.focus();
+function loadUserPrefs() {
+  try {
+    const prefs = JSON.parse(localStorage.getItem(STORAGE_PREFS_KEY) || "{}");
+    selectedOnlyToggle.checked = Boolean(prefs.selectedOnly);
+    dedupeToggle.checked = prefs.dedupe !== false;
+    maxResultsInput.value = prefs.maxResults || "";
+    domainFilterInput.value = prefs.domainFilter || "";
+    const selected = new Set(
+      Array.isArray(prefs.typeFilters)
+        ? prefs.typeFilters
+        : ["video", "image", "audio", "file", "folder", "other"],
+    );
+    typeFilterCheckboxes.forEach((item) => {
+      item.checked = selected.has(item.value);
     });
-    recentUrls.appendChild(chip);
+  } catch {
+    dedupeToggle.checked = true;
+  }
+}
+
+function loadHistoryTabs() {
+  let tabs = [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
+    tabs = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    tabs = [];
+  }
+
+  if (!tabs.length) {
+    const legacyUrls = getRecentUrls();
+    tabs = legacyUrls.map((url, index) =>
+      createHistoryTab(url, { label: `历史 ${index + 1}` }),
+    );
+  }
+  historyTabsData = sanitizeHistoryTabs(tabs);
+  if (!activeHistoryId && historyTabsData[0]) {
+    activeHistoryId = historyTabsData[0].id;
+  }
+}
+
+function sanitizeHistoryTabs(tabs) {
+  return tabs
+    .filter((item) => item && typeof item.url === "string")
+    .map((item, index) => ({
+      id: item.id || `history-${Date.now()}-${index}`,
+      url: sanitizeUrl(item.url),
+      label: (item.label || "").trim(),
+      note: (item.note || "").trim(),
+      pinned: Boolean(item.pinned),
+      createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt || new Date().toISOString(),
+      useCount: Number(item.useCount || 0),
+      lastUsedAt: item.lastUsedAt || item.updatedAt || new Date().toISOString(),
+    }))
+    .filter((item) => item.url && ensureValidUrl(item.url));
+}
+
+function createHistoryTab(url, patch = {}) {
+  const now = new Date().toISOString();
+  return {
+    id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    url,
+    label: patch.label || "",
+    note: patch.note || "",
+    pinned: Boolean(patch.pinned),
+    createdAt: now,
+    updatedAt: now,
+    useCount: 1,
+    lastUsedAt: now,
+  };
+}
+
+function persistHistoryTabs() {
+  historyTabsData.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime();
   });
+  localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(historyTabsData.slice(0, 80)));
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(historyTabsData.slice(0, 8).map((item) => item.url)),
+  );
+}
+
+function saveRecentUrl(url) {
+  const normalized = sanitizeUrl(url);
+  if (!normalized || !ensureValidUrl(normalized)) return;
+
+  const now = new Date().toISOString();
+  const existing = historyTabsData.find((item) => item.url === normalized);
+  if (existing) {
+    existing.lastUsedAt = now;
+    existing.updatedAt = now;
+    existing.useCount += 1;
+    activeHistoryId = existing.id;
+  } else {
+    const tab = createHistoryTab(normalized);
+    historyTabsData.push(tab);
+    activeHistoryId = tab.id;
+  }
+
+  persistHistoryTabs();
+  renderHistoryTabs();
+}
+
+function getActiveHistoryItem() {
+  return historyTabsData.find((item) => item.id === activeHistoryId) || null;
+}
+
+function renderHistoryTabs() {
+  historyTabs.innerHTML = "";
+  const keyword = historySearchInput.value.trim().toLowerCase();
+  const filtered = historyTabsData.filter((item) => {
+    if (!keyword) return true;
+    return (
+      item.url.toLowerCase().includes(keyword) ||
+      item.label.toLowerCase().includes(keyword) ||
+      item.note.toLowerCase().includes(keyword)
+    );
+  });
+
+  filtered.forEach((item) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = `history-tab${item.id === activeHistoryId ? " active" : ""}`;
+    tab.title = item.url;
+    tab.textContent = `${item.pinned ? "📌 " : ""}${item.label || item.url}`;
+    tab.addEventListener("click", () => {
+      activeHistoryId = item.id;
+      urlInput.value = item.url;
+      item.lastUsedAt = new Date().toISOString();
+      persistHistoryTabs();
+      syncHistoryEditor();
+      renderHistoryTabs();
+    });
+    historyTabs.appendChild(tab);
+  });
+
+  syncHistoryEditor();
+}
+
+function syncHistoryEditor() {
+  const active = getActiveHistoryItem();
+  historyLabelInput.value = active?.label || "";
+  historyNoteInput.value = active?.note || "";
+}
+
+function saveActiveHistoryMeta() {
+  const active = getActiveHistoryItem();
+  if (!active) {
+    showToast("请先选择一个历史标签");
+    return;
+  }
+  active.label = historyLabelInput.value.trim();
+  active.note = historyNoteInput.value.trim();
+  active.updatedAt = new Date().toISOString();
+  persistHistoryTabs();
+  renderHistoryTabs();
+  showToast("✓ 标签信息已保存");
+}
+
+function toggleActiveHistoryPin() {
+  const active = getActiveHistoryItem();
+  if (!active) {
+    showToast("请先选择一个历史标签");
+    return;
+  }
+  active.pinned = !active.pinned;
+  active.updatedAt = new Date().toISOString();
+  persistHistoryTabs();
+  renderHistoryTabs();
+}
+
+function deleteActiveHistory() {
+  const active = getActiveHistoryItem();
+  if (!active) {
+    showToast("请先选择一个历史标签");
+    return;
+  }
+  historyTabsData = historyTabsData.filter((item) => item.id !== active.id);
+  activeHistoryId = historyTabsData[0]?.id || "";
+  persistHistoryTabs();
+  renderHistoryTabs();
+}
+
+function clearHistoryTabs() {
+  historyTabsData = [];
+  activeHistoryId = "";
+  persistHistoryTabs();
+  renderHistoryTabs();
+  showToast("✓ 历史标签已清空");
+}
+
+function exportHistoryTabs() {
+  const blob = new Blob([JSON.stringify(historyTabsData, null, 2)], {
+    type: "application/json;charset=utf-8",
+  });
+  downloadBlob(blob, "history_tabs.json");
+}
+
+function importHistoryTabs(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || "[]"));
+      const imported = sanitizeHistoryTabs(Array.isArray(parsed) ? parsed : []);
+      const mergedMap = new Map(historyTabsData.map((item) => [item.url, item]));
+      imported.forEach((item) => mergedMap.set(item.url, item));
+      historyTabsData = [...mergedMap.values()];
+      activeHistoryId = historyTabsData[0]?.id || "";
+      persistHistoryTabs();
+      renderHistoryTabs();
+      showToast(`✓ 已导入 ${imported.length} 条历史标签`);
+    } catch {
+      showToast("✗ 导入失败，文件格式无效");
+    }
+  };
+  reader.readAsText(file, "utf-8");
+  importHistoryInput.value = "";
 }
 
 function normalizeType(type) {
@@ -247,6 +616,23 @@ function createItem(url, type, index, name = "") {
 }
 
 function isVisibleByFilter(item) {
+  const enabledTypes = new Set(
+    typeFilterCheckboxes.filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value),
+  );
+  if (!enabledTypes.has(item.type)) return false;
+
+  if (selectedOnlyToggle.checked && !item.selected) return false;
+
+  const domainKeyword = domainFilterInput.value.trim().toLowerCase();
+  if (domainKeyword) {
+    try {
+      const host = new URL(item.url).hostname.toLowerCase();
+      if (!host.includes(domainKeyword)) return false;
+    } catch {
+      return false;
+    }
+  }
+
   const keyword = filterInput.value.trim().toLowerCase();
   if (!keyword) return true;
   return (
@@ -262,6 +648,13 @@ function getSortedItems(items) {
   if (mode === "url") sorted.sort((a, b) => a.url.localeCompare(b.url));
   if (mode === "length") sorted.sort((a, b) => a.url.length - b.url.length);
   if (mode === "type") sorted.sort((a, b) => a.type.localeCompare(b.type));
+  if (mode === "domain") {
+    sorted.sort((a, b) => {
+      const hostA = new URL(a.url).hostname;
+      const hostB = new URL(b.url).hostname;
+      return hostA.localeCompare(hostB);
+    });
+  }
   return sorted;
 }
 
@@ -333,7 +726,9 @@ function buildRow(item) {
   const openBtn = document.createElement("button");
   openBtn.className = "btn btn-primary";
   openBtn.textContent = "打开";
-  openBtn.addEventListener("click", () => window.open(item.url, "_blank", "noopener,noreferrer"));
+  openBtn.addEventListener("click", () =>
+    window.open(item.url, "_blank", "noopener,noreferrer"),
+  );
 
   actions.appendChild(previewBtn);
   actions.appendChild(copyBtn);
@@ -346,11 +741,18 @@ function buildRow(item) {
 
 function renderItems() {
   videosList.innerHTML = "";
-  const visible = getSortedItems(currentItems.filter((item) => isVisibleByFilter(item)));
+  let visible = getSortedItems(
+    currentItems.filter((item) => isVisibleByFilter(item)),
+  );
+  const maxResults = Number(maxResultsInput.value || 0);
+  if (Number.isFinite(maxResults) && maxResults > 0) {
+    visible = visible.slice(0, maxResults);
+  }
   visible.forEach((item) => videosList.appendChild(buildRow(item)));
   videoCountPill.textContent = `${currentItems.length} 个资源`;
   setSectionVisible(videosSection, currentItems.length > 0);
   setSectionVisible(downloadAllBtn, currentItems.length > 0);
+  saveUserPrefs();
   updateStats();
 }
 
@@ -373,7 +775,9 @@ async function requestJson(url, options = {}, timeoutMs = 30000) {
 }
 
 async function detectLocalFallback() {
-  const isLocalHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+  const isLocalHost = ["127.0.0.1", "localhost"].includes(
+    window.location.hostname,
+  );
   if (!isLocalHost || API_BASE !== "/api") return;
   try {
     await requestJson(`${API_BASE}/health`, { method: "GET" });
@@ -385,7 +789,8 @@ async function detectLocalFallback() {
 async function bootstrapRuntimeDiagnostics(showToastResult = false) {
   await detectLocalFallback();
   setSectionVisible(previewModal, false);
-  const envLabel = window.location.protocol === "file:" ? "本地文件模式" : "网页模式";
+  const envLabel =
+    window.location.protocol === "file:" ? "本地文件模式" : "网页模式";
   runtimeHint.textContent = ` 当前模式：${envLabel} · API：${API_BASE}`;
   try {
     await requestJson(`${API_BASE}/health`, { method: "GET" });
@@ -427,8 +832,49 @@ async function requestResources(url, mode) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
   });
-  const items = mode === "all" ? mapExtractResources(data) : mapScrapeVideos(data);
+  const items =
+    mode === "all" ? mapExtractResources(data) : mapScrapeVideos(data);
   return { data, items };
+}
+
+async function scrapeUrls(urls) {
+  const mode = modeSelect.value;
+  const merged = [];
+  const seen = new Set();
+  const failed = [];
+  let lastData = {};
+
+  for (let index = 0; index < urls.length; index += 1) {
+    const url = urls[index];
+    const progress = Math.min(90, 20 + Math.round(((index + 1) / urls.length) * 70));
+    updateStatus(
+      "loading",
+      "⏳",
+      "正在解析",
+      `正在处理第 ${index + 1}/${urls.length} 个链接...`,
+      progress,
+    );
+    try {
+      const { data, items } = await requestResources(url, mode);
+      lastData = data;
+      saveRecentUrl(url);
+      items.forEach((item) => {
+        if (!dedupeToggle.checked) {
+          merged.push(item);
+          return;
+        }
+        const key = `${item.type}::${item.url}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(item);
+        }
+      });
+    } catch (error) {
+      failed.push({ url, reason: error.message });
+    }
+  }
+
+  return { merged, failed, lastData };
 }
 
 async function handleScrape() {
@@ -445,31 +891,8 @@ async function handleScrape() {
   updateStatus("loading", "⏳", "正在解析", "正在抓取页面资源，请稍候...", 28);
 
   try {
-    const mode = modeSelect.value;
-    const merged = [];
-    const seen = new Set();
-    const failed = [];
-    let lastData = {};
-
-    for (let index = 0; index < urls.length; index += 1) {
-      const url = urls[index];
-      const progress = Math.min(90, 20 + Math.round(((index + 1) / urls.length) * 70));
-      updateStatus("loading", "⏳", "正在解析", `正在处理第 ${index + 1}/${urls.length} 个链接...`, progress);
-      try {
-        const { data, items } = await requestResources(url, mode);
-        lastData = data;
-        saveRecentUrl(url);
-        items.forEach((item) => {
-          const key = `${item.type}::${item.url}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            merged.push(item);
-          }
-        });
-      } catch (error) {
-        failed.push(`${url}（${error.message}）`);
-      }
-    }
+    const { merged, failed, lastData } = await scrapeUrls(urls);
+    lastFailedUrls = failed.map((item) => item.url);
 
     currentItems = merged;
 
@@ -490,9 +913,42 @@ async function handleScrape() {
     }
 
     const suffix = failed.length ? `（失败 ${failed.length} 个链接）` : "";
-    updateStatus("success", "✓", "解析完成", `找到 ${currentItems.length} 个资源${suffix}`, 100);
+    updateStatus(
+      "success",
+      "✓",
+      "解析完成",
+      `找到 ${currentItems.length} 个资源${suffix}`,
+      100,
+    );
   } catch (error) {
     updateStatus("error", "✗", "解析失败", error.message, 0);
+  } finally {
+    scrapeBtn.disabled = false;
+  }
+}
+
+async function retryFailedUrls() {
+  if (!lastFailedUrls.length) {
+    showToast("当前没有可重试的失败链接");
+    return;
+  }
+  scrapeBtn.disabled = true;
+  try {
+    const { merged, failed } = await scrapeUrls(lastFailedUrls);
+    const map = new Map(currentItems.map((item) => [`${item.type}::${item.url}`, item]));
+    merged.forEach((item) => map.set(`${item.type}::${item.url}`, item));
+    currentItems = [...map.values()];
+    lastFailedUrls = failed.map((item) => item.url);
+    renderItems();
+    updateStatus(
+      "success",
+      "✓",
+      "重试完成",
+      `重试成功新增 ${merged.length} 个资源，剩余失败 ${lastFailedUrls.length} 个链接`,
+      100,
+    );
+  } catch (error) {
+    updateStatus("error", "✗", "重试失败", error.message, 0);
   } finally {
     scrapeBtn.disabled = false;
   }
@@ -507,13 +963,21 @@ async function handlePackageDownload(onlySelected) {
 
   downloadAllBtn.disabled = true;
   downloadSelectedBtn.disabled = true;
-  updateStatus("loading", "⏳", "正在打包", `正在打包 ${targets.length} 个资源...`, 60);
+  updateStatus(
+    "loading",
+    "⏳",
+    "正在打包",
+    `正在打包 ${targets.length} 个资源...`,
+    60,
+  );
 
   try {
     const data = await requestJson(`${API_BASE}/package`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ videos: targets.map((item) => ({ url: item.url })) }),
+      body: JSON.stringify({
+        videos: targets.map((item) => ({ url: item.url })),
+      }),
     });
 
     if (!data.zip_data) throw new Error("未生成可下载压缩包");
@@ -525,7 +989,13 @@ async function handlePackageDownload(onlySelected) {
     link.click();
     document.body.removeChild(link);
 
-    updateStatus("success", "✓", "打包完成", data.message || "压缩包下载已开始", 100);
+    updateStatus(
+      "success",
+      "✓",
+      "打包完成",
+      data.message || "压缩包下载已开始",
+      100,
+    );
   } catch (error) {
     updateStatus("error", "✗", "打包失败", error.message, 0);
   } finally {
@@ -564,7 +1034,9 @@ function exportJsonReport() {
     selected: selectedItems().length,
     resources: currentItems,
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json;charset=utf-8",
+  });
   downloadBlob(blob, "resource_report.json");
 }
 
@@ -573,9 +1045,25 @@ function exportTxtReport() {
     showToast("没有可导出的资源");
     return;
   }
-  const content = currentItems.map((item) => `[${item.type}] ${item.url}`).join("\n");
+  const content = currentItems
+    .map((item) => `[${item.type}] ${item.url}`)
+    .join("\n");
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   downloadBlob(blob, "resource_links.txt");
+}
+
+function exportCsvReport() {
+  if (!currentItems.length) {
+    showToast("没有可导出的资源");
+    return;
+  }
+  const rows = ["type,url,name,selected"];
+  currentItems.forEach((item) => {
+    const values = [item.type, item.url, item.name || "", item.selected ? "1" : "0"];
+    rows.push(values.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","));
+  });
+  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+  downloadBlob(blob, "resource_links.csv");
 }
 
 function downloadBlob(blob, filename) {
@@ -590,7 +1078,8 @@ function downloadBlob(blob, filename) {
 
 function openPreview(item) {
   const lower = item.url.toLowerCase();
-  const isVideo = /\.(mp4|webm|ogg|mov|m3u8)(\?|$)/.test(lower) || item.type === "video";
+  const isVideo =
+    /\.(mp4|webm|ogg|mov|m3u8)(\?|$)/.test(lower) || item.type === "video";
   if (!isVideo) {
     window.open(item.url, "_blank", "noopener,noreferrer");
     return;

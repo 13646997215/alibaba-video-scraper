@@ -187,5 +187,31 @@ def extract_resources():
         return jsonify({"status": "error", "error": f"提取失败: {str(error)}"}), 500
 
 
+@app.post("/api/diag")
+def diag_target():
+    payload = request.get_json(silent=True) or {}
+    target = normalize_input_url(payload.get("url", ""))
+    if not target:
+        return jsonify({"status": "error", "error": "url 不能为空"}), 400
+
+    try:
+        response = safe_requests_get(target, timeout=20)
+        return jsonify(
+            {
+                "status": "success",
+                "message": "诊断完成",
+                "target": target,
+                "final_url": response.url or target,
+                "status_code": response.status_code,
+                "content_type": response.headers.get("Content-Type", ""),
+                "server": response.headers.get("Server", ""),
+                "content_length": response.headers.get("Content-Length", ""),
+                "environment": "local-flask",
+            }
+        )
+    except requests.RequestException as error:
+        return jsonify({"status": "error", "error": f"诊断失败: {str(error)}"}), 500
+
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)

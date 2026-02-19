@@ -1,5 +1,15 @@
 import json
 
+import requests
+
+
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Connection": "keep-alive",
+}
+
 
 def set_cors_headers(handler):
     handler.send_header("Access-Control-Allow-Origin", "*")
@@ -23,3 +33,11 @@ def read_json_body(handler):
     if not body:
         return {}
     return json.loads(body)
+
+
+def safe_requests_get(url: str, timeout: int = 25, headers: dict | None = None, **kwargs):
+    merged_headers = {**DEFAULT_HEADERS, **(headers or {})}
+    try:
+        return requests.get(url, timeout=timeout, headers=merged_headers, **kwargs)
+    except requests.exceptions.SSLError:
+        return requests.get(url, timeout=timeout, headers=merged_headers, verify=False, **kwargs)

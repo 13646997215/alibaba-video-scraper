@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 
 import requests
 
-from api._common import read_json_body, send_json, set_cors_headers
+from api._common import read_json_body, safe_requests_get, send_json, set_cors_headers
 
 
 def filename_from_url(video_url: str, index: int) -> str:
@@ -57,7 +57,7 @@ class handler(BaseHTTPRequestHandler):
                     if not isinstance(video_url, str) or not video_url.startswith(("http://", "https://")):
                         continue
                     try:
-                        response = requests.get(video_url, timeout=30)
+                        response = safe_requests_get(video_url, timeout=30)
                         response.raise_for_status()
                         zip_file.writestr(filename_from_url(video_url, index), response.content)
                         success_count += 1

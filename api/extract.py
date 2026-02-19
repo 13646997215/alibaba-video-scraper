@@ -5,7 +5,7 @@ from pathlib import Path
 
 import requests
 
-from api._common import read_json_body, send_json, set_cors_headers
+from api._common import read_json_body, safe_requests_get, send_json, set_cors_headers
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -40,7 +40,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            response = requests.get(page_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+            response = safe_requests_get(page_url, timeout=25)
             response.raise_for_status()
             html = response.text
             final_url = response.url or page_url
@@ -56,6 +56,7 @@ class handler(BaseHTTPRequestHandler):
                     "resources": resources,
                     "counts": counts,
                     "total": sum(counts.values()),
+                    "debug": {"environment": "vercel-serverless"},
                 },
             )
         except requests.RequestException as error:

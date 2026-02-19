@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
-from api._common import read_json_body, send_json, set_cors_headers
+from api._common import read_json_body, safe_requests_get, send_json, set_cors_headers
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -76,7 +76,23 @@ class handler(BaseHTTPRequestHandler):
 
             if not videos:
                 extracted = extract_resources_from_html(html, page_url)
-                videos = [item["url"] for item in extracted.get("videos", [])]
+                videos = [item["url"] for item in extracted.get("videos", []) if isinstance(item, dict)]
+
+            if not videos:
+                try:
+                    fallback_response = safe_requests_get(page_url, timeout=25)
+                    fallback_response.raise_for_status()
+                    fallback_resources = extract_resources_from_html(
+                        fallback_response.text,
+                        fallback_response.url or page_url,
+                    )
+                    videos = [
+                        item["url"]
+                        for item in fallback_resources.get("videos", [])
+                        if isinstance(item, dict)
+                    ]
+                except requests.RequestException:
+                    pass
 
             if not videos:
                 send_json(
@@ -92,7 +108,12 @@ class handler(BaseHTTPRequestHandler):
                             "请确认链接是商品详情页，而不是搜索页或店铺首页",
                             "请尝试更换其他商品链接",
                             "部分商品视频可能由前端动态加密加载",
+                            "如仅 Vercel 失败，通常是目标站点对机房 IP 有风控限制",
                         ],
+                        "debug": {
+                            "environment": "vercel-serverless",
+                            "hint": "可优先尝试全资源模式，或使用其他商品链接",
+                        },
                     },
                 )
                 return
@@ -106,6 +127,7 @@ class handler(BaseHTTPRequestHandler):
                     "videos": videos,
                     "count": len(videos),
                     "page_title": page_title,
+                    "debug": {"environment": "vercel-serverless"},
                 },
             )
         except (requests.RequestException, ValueError, TypeError, RuntimeError, OSError) as error:

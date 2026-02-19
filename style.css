@@ -115,7 +115,9 @@ body {
       transparent 35%
     ),
     linear-gradient(145deg, var(--off-white), var(--gradient-end));
-  transition: background 0.35s ease, color 0.25s ease;
+  transition:
+    background 0.35s ease,
+    color 0.25s ease;
 }
 
 .app-shell {
@@ -163,11 +165,7 @@ body {
   border-radius: 12px;
   box-shadow: var(--shadow);
   border: 1px solid var(--card-border);
-  background: linear-gradient(
-    130deg,
-    var(--card-bg-start),
-    var(--card-bg-end)
-  );
+  background: linear-gradient(130deg, var(--card-bg-start), var(--card-bg-end));
   backdrop-filter: blur(8px);
 }
 
@@ -311,6 +309,59 @@ body {
   color: var(--text-secondary);
 }
 
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.history-header h2 {
+  font-size: 18px;
+}
+
+.history-actions-inline {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.history-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.history-tab {
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--soft-text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  max-width: 100%;
+  font-size: 12px;
+}
+
+.history-tab.active {
+  border-color: var(--primary-end);
+  box-shadow: 0 0 0 2px var(--pill-bg);
+}
+
+.history-editor {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.history-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .quick-actions {
   margin-top: 10px;
   display: flex;
@@ -340,6 +391,32 @@ body {
   display: grid;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.type-filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-option {
+  border: 1px solid var(--soft-border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--soft-bg);
+  color: var(--soft-text);
+  font-size: 12px;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .tool-row {
@@ -604,6 +681,24 @@ body {
 }
 
 @media (max-width: 560px) {
+  .history-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-actions-inline,
+  .history-editor-actions,
+  .toggle-row {
+    width: 100%;
+  }
+
+  .history-actions-inline .btn,
+  .history-editor-actions .btn,
+  .toggle-row .btn {
+    flex: 1;
+    text-align: center;
+  }
+
   .tool-row {
     grid-template-columns: 1fr;
   }

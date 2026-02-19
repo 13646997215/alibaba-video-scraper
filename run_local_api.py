@@ -85,7 +85,18 @@ def scrape():
     except (TypeError, ValueError, AttributeError):
         page_title = ""
 
-    if scraper.detect_anti_bot_page(html):
+    scraper.extract_videos_from_html(html)
+    videos = []
+    for item in scraper.video_urls:
+        normalized = normalize_video_url(item, page_url)
+        if normalized.startswith("http") and normalized not in videos:
+            videos.append(normalized)
+
+    if not videos:
+        resources = extract_resources_from_html(html, page_url)
+        videos = [item.get("url") for item in resources.get("videos", []) if isinstance(item, dict)]
+
+    if not videos and scraper.detect_anti_bot_page(html):
         return jsonify(
             {
                 "status": "error",
@@ -98,17 +109,6 @@ def scrape():
                 ],
             }
         ), 423
-
-    scraper.extract_videos_from_html(html)
-    videos = []
-    for item in scraper.video_urls:
-        normalized = normalize_video_url(item, page_url)
-        if normalized.startswith("http") and normalized not in videos:
-            videos.append(normalized)
-
-    if not videos:
-        resources = extract_resources_from_html(html, page_url)
-        videos = [item.get("url") for item in resources.get("videos", []) if isinstance(item, dict)]
 
     if not videos:
         return jsonify(

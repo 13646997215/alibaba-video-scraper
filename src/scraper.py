@@ -19,6 +19,7 @@ class AlibabaVideoScraper:
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
                 "Connection": "keep-alive",
+                "Referer": "https://www.alibaba.com/",
             }
         )
 
@@ -64,11 +65,33 @@ class AlibabaVideoScraper:
             response = self._safe_get(url, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             response.encoding = "utf-8"
+            html = response.text
+
+            if self.detect_anti_bot_page(html):
+                print("! 检测到反爬校验页，尝试预热会话并重试一次")
+                self._warm_up_session()
+                retry_response = self._safe_get(url, timeout=REQUEST_TIMEOUT)
+                retry_response.raise_for_status()
+                retry_response.encoding = "utf-8"
+                html = retry_response.text
+
             print("✓ 页面获取成功")
-            return response.text
+            return html
         except requests.RequestException as error:
             print(f"✗ 页面获取失败: {error}")
             return None
+
+    def _warm_up_session(self):
+        warmup_urls = [
+            "https://www.alibaba.com/",
+            "https://www.alibaba.com/trade/search?fsb=y&IndexArea=product_en&SearchText=sunglasses",
+        ]
+        for warmup_url in warmup_urls:
+            try:
+                resp = self._safe_get(warmup_url, timeout=min(12, REQUEST_TIMEOUT))
+                _ = resp.text
+            except requests.RequestException:
+                continue
 
     def _safe_get(self, url, **kwargs):
         try:

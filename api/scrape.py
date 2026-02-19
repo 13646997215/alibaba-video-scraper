@@ -68,27 +68,6 @@ class handler(BaseHTTPRequestHandler):
             except (TypeError, ValueError, AttributeError):
                 page_title = ""
 
-            if scraper.detect_anti_bot_page(html):
-                send_json(
-                    self,
-                    423,
-                    {
-                        "status": "error",
-                        "error": "目标站触发反爬校验页（Captcha/Punish），当前请求环境无法直接提取视频。",
-                        "code": "ANTI_BOT_BLOCKED",
-                        "tips": [
-                            "请稍后重试，或更换网络出口",
-                            "可先用全资源模式确认页面是否仅返回校验内容",
-                            "若 Vercel 失败但浏览器可看视频，通常是机房 IP 被风控",
-                        ],
-                        "debug": {
-                            "environment": "vercel-serverless",
-                            "page_title": page_title,
-                        },
-                    },
-                )
-                return
-
             videos = []
             for item in scraper.video_urls:
                 normalized = normalize_video_url(item, page_url)
@@ -114,6 +93,27 @@ class handler(BaseHTTPRequestHandler):
                     ]
                 except requests.RequestException:
                     pass
+
+            if not videos and scraper.detect_anti_bot_page(html):
+                send_json(
+                    self,
+                    423,
+                    {
+                        "status": "error",
+                        "error": "目标站触发反爬校验页（Captcha/Punish），当前请求环境无法直接提取视频。",
+                        "code": "ANTI_BOT_BLOCKED",
+                        "tips": [
+                            "请稍后重试，或更换网络出口",
+                            "可先用全资源模式确认页面是否仅返回校验内容",
+                            "若 Vercel 失败但浏览器可看视频，通常是机房 IP 被风控",
+                        ],
+                        "debug": {
+                            "environment": "vercel-serverless",
+                            "page_title": page_title,
+                        },
+                    },
+                )
+                return
 
             if not videos:
                 send_json(

@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 import requests
+from bs4 import BeautifulSoup
 
 from api._common import read_json_body, send_json, set_cors_headers
 
@@ -59,6 +60,13 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             scraper.extract_videos_from_html(html)
+            page_title = ""
+            try:
+                title_node = BeautifulSoup(html, "html.parser").title
+                page_title = (title_node.get_text(strip=True) if title_node else "")
+            except (TypeError, ValueError, AttributeError):
+                page_title = ""
+
             videos = []
             for item in scraper.video_urls:
                 normalized = normalize_video_url(item, page_url)
@@ -66,7 +74,22 @@ class handler(BaseHTTPRequestHandler):
                     videos.append(normalized)
 
             if not videos:
-                send_json(self, 404, {"status": "error", "error": "未找到可下载视频，请尝试其他商品页"})
+                send_json(
+                    self,
+                    200,
+                    {
+                        "status": "success",
+                        "message": "页面已解析，但未找到可下载视频",
+                        "videos": [],
+                        "count": 0,
+                        "page_title": page_title,
+                        "tips": [
+                            "请确认链接是商品详情页，而不是搜索页或店铺首页",
+                            "请尝试更换其他商品链接",
+                            "部分商品视频可能由前端动态加密加载",
+                        ],
+                    },
+                )
                 return
 
             send_json(
@@ -77,6 +100,7 @@ class handler(BaseHTTPRequestHandler):
                     "message": f"找到 {len(videos)} 个视频",
                     "videos": videos,
                     "count": len(videos),
+                    "page_title": page_title,
                 },
             )
         except (requests.RequestException, ValueError, TypeError, RuntimeError, OSError) as error:

@@ -37,12 +37,23 @@ class handler(BaseHTTPRequestHandler):
             send_json(self, 400, {"status": "error", "error": "没有视频可打包"})
             return
 
+        normalized_videos = []
+        for item in videos:
+            if isinstance(item, str):
+                normalized_videos.append(item)
+            elif isinstance(item, dict) and isinstance(item.get("url"), str):
+                normalized_videos.append(item.get("url"))
+
+        if len(normalized_videos) == 0:
+            send_json(self, 400, {"status": "error", "error": "没有有效视频链接可打包"})
+            return
+
         try:
             zip_buffer = io.BytesIO()
             success_count = 0
 
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                for index, video_url in enumerate(videos, start=1):
+                for index, video_url in enumerate(normalized_videos, start=1):
                     if not isinstance(video_url, str) or not video_url.startswith(("http://", "https://")):
                         continue
                     try:
@@ -64,11 +75,11 @@ class handler(BaseHTTPRequestHandler):
                 200,
                 {
                     "status": "success",
-                    "message": f"打包完成，成功 {success_count}/{len(videos)}",
+                    "message": f"打包完成，成功 {success_count}/{len(normalized_videos)}",
                     "zip_data": zip_base64,
                     "filename": "alibaba_videos.zip",
                     "success_count": success_count,
-                    "total_count": len(videos),
+                    "total_count": len(normalized_videos),
                 },
             )
         except (requests.RequestException, ValueError, TypeError, RuntimeError, OSError) as error:

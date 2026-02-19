@@ -38,10 +38,16 @@
             />
             <button id="scrapeBtn" class="btn btn-primary">开始爬取</button>
           </div>
+          <div class="quick-actions">
+            <button id="clearUrlBtn" class="btn btn-soft" type="button">清空链接</button>
+            <button id="pasteUrlBtn" class="btn btn-soft" type="button">粘贴链接</button>
+            <button id="sampleUrlBtn" class="btn btn-soft" type="button">示例链接</button>
+          </div>
           <p class="helper-text">
             支持阿里巴巴商品详情页，建议直接粘贴完整链接。
             <span id="runtimeHint"></span>
           </p>
+          <div id="recentUrls" class="recent-urls" hidden></div>
         </section>
 
         <section class="card status-section" id="statusSection" hidden>
@@ -64,6 +70,17 @@
             <h2>解析结果</h2>
             <span class="count-pill" id="videoCountPill">0 个视频</span>
           </div>
+          <div class="result-tools">
+            <input id="filterInput" class="filter-input" type="text" placeholder="筛选视频链接关键字..." />
+            <div class="tool-buttons">
+              <button id="selectAllBtn" class="btn btn-soft" type="button">全选</button>
+              <button id="invertSelectBtn" class="btn btn-soft" type="button">反选</button>
+              <button id="copyAllBtn" class="btn btn-soft" type="button">复制全部</button>
+              <button id="exportJsonBtn" class="btn btn-soft" type="button">导出JSON</button>
+              <button id="downloadSelectedBtn" class="btn btn-soft" type="button">打包所选</button>
+            </div>
+          </div>
+          <div class="result-stats" id="resultStats"></div>
           <div class="videos-list" id="videosList"></div>
         </section>
       </main>
@@ -71,6 +88,17 @@
       <button id="downloadAllBtn" class="fab" title="打包下载全部视频" hidden>
         📦 打包下载全部
       </button>
+
+      <div id="previewModal" class="preview-modal" hidden>
+        <div class="preview-panel">
+          <div class="preview-header">
+            <strong>视频预览</strong>
+            <button id="closePreviewBtn" class="btn btn-soft" type="button">关闭</button>
+          </div>
+          <video id="previewPlayer" controls class="preview-player"></video>
+          <div id="previewUrl" class="preview-url"></div>
+        </div>
+      </div>
     </div>
 
     <script src="script.js"></script>

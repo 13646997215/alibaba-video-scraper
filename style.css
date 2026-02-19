@@ -303,6 +303,12 @@ body {
   background: var(--soft-bg-hover);
 }
 
+.nav-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
 .helper-text {
   margin-top: 8px;
   font-size: 12px;
@@ -540,6 +546,26 @@ body {
   margin-top: 2px;
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+.diag-output {
+  margin-top: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+}
+
+.help-list {
+  margin-top: 10px;
+  padding-left: 18px;
+  color: var(--text-primary);
+  line-height: 1.7;
 }
 
 .progress-bar {

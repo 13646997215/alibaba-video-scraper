@@ -1,4 +1,5 @@
 import json
+import re
 from http.server import BaseHTTPRequestHandler
 
 import requests
@@ -28,6 +29,13 @@ class handler(BaseHTTPRequestHandler):
 
         try:
             response = safe_requests_get(target, timeout=20, allow_redirects=True)
+            html = response.text or ""
+            video_tokens = {
+                "videoUrl": len(re.findall(r'"videoUrl"\s*:\s*"([^"]+)"', html)),
+                "escapedVideoUrl": len(re.findall(r'\\"videoUrl\\"\s*:\s*\\"([^\\"]+)\\"', html)),
+                "directMp4": len(re.findall(r'https?://[^\s"\'<>]+\.(?:mp4|webm|ogg|mov)', html)),
+                "escapedMp4": len(re.findall(r'https?:\\/\\/[^\s"\'<>]+\.(?:mp4|webm|ogg|mov)', html)),
+            }
             send_json(
                 self,
                 200,
@@ -41,6 +49,8 @@ class handler(BaseHTTPRequestHandler):
                     "server": response.headers.get("Server", ""),
                     "content_length": response.headers.get("Content-Length", ""),
                     "environment": "vercel-serverless",
+                    "html_length": len(html),
+                    "video_tokens": video_tokens,
                 },
             )
         except (requests.RequestException, ValueError, TypeError, OSError) as error:

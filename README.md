@@ -55,6 +55,9 @@
 - `run_local_api.py`：本地 Flask API
 - `api/`：Vercel 文件路由 API（serverless）
 - `src/`：抓取与资源提取核心逻辑
+- `diagnostics.html`：网页诊断中心
+- `help.html`：帮助与排障页面
+- `scripts/vercel_e2e_check.py`：线上/本地对比实测脚本
 
 ## 本地运行（Windows）
 
@@ -137,6 +140,22 @@ http://127.0.0.1:5000/api/health
 4. 在 Vercel Function Logs 查看目标请求返回差异（本地 IP 与机房 IP 风控策略可能不同）
 
 说明：本项目已做最大化兼容（请求头、SSL 回退、二次提取），但若目标站对数据中心 IP 强限制，线上结果仍可能少于本地。
+
+当接口返回 `code=ANTI_BOT_BLOCKED` 时，表示目标站返回了校验页（Punish/Captcha），不是 API 路由故障。
+
+## Vercel 线上实测脚本
+
+使用同一测试 URL 同时检测 Vercel 与本地，自动输出差异：
+
+```bash
+python scripts/vercel_e2e_check.py --target-url "https://www.alibaba.com/product-detail/..."
+```
+
+仅测 Vercel：
+
+```bash
+python scripts/vercel_e2e_check.py --target-url "https://www.alibaba.com/product-detail/..." --skip-local
+```
 
 ## Vercel 部署
 

@@ -1,6 +1,7 @@
 import json
 import re
 import time
+from html import unescape
 
 import requests
 from bs4 import BeautifulSoup
@@ -36,6 +37,26 @@ class AlibabaVideoScraper:
             return
         if normalized.startswith("http") and normalized not in self.video_urls:
             self.video_urls.append(normalized)
+
+    def _append_candidate(self, candidate: str):
+        if not candidate:
+            return
+        value = unescape(candidate).strip().replace("\\u002F", "/").replace("\\/", "/")
+        self._append_video_url(value)
+
+    @staticmethod
+    def detect_anti_bot_page(html: str) -> bool:
+        content = (html or "").lower()
+        signals = [
+            "punish-component",
+            "sufei-punish",
+            "awsc.js",
+            "captcha",
+            "x5sec",
+            "lib-windvane",
+            "deny",
+        ]
+        return sum(1 for signal in signals if signal in content) >= 3
 
     def fetch_page(self, url):
         print(f"正在获取页面: {url}")
@@ -92,12 +113,23 @@ class AlibabaVideoScraper:
             r'"previewVideoUrl"\s*:\s*"([^"]+)"',
             r'"mediaUrl"\s*:\s*"([^"]+)"',
             r'src=[\'\"](https?://[^\'\"]+\.(?:mp4|webm|ogg|mov))[\'\"]',
+            r'https?:\\/\\/[^\s"\'<>]+\.(?:mp4|webm|ogg|mov)',
+            r'\\"videoUrl\\"\s*:\s*\\"([^\\"]+)\\"',
+            r'\\"playUrl\\"\s*:\s*\\"([^\\"]+)\\"',
+            r'\\"previewVideoUrl\\"\s*:\s*\\"([^\\"]+)\\"',
+            r'\\"mediaUrl\\"\s*:\s*\\"([^\\"]+)\\"',
         ]
 
         for pattern in patterns:
             for match in re.findall(pattern, html):
                 candidate = match if isinstance(match, str) else match[0]
-                self._append_video_url(candidate)
+                self._append_candidate(candidate)
+
+        compact = html.replace("\\n", " ")
+        for key in ["videoUrl", "playUrl", "previewVideoUrl", "mediaUrl"]:
+            quoted_pattern = rf"{key}\\u0022:\\u0022([^\\u0022]+(?:\\.mp4|\\.webm|\\.ogg|\\.mov)[^\\u0022]*)"
+            for match in re.findall(quoted_pattern, compact):
+                self._append_candidate(match)
 
         if not self.video_urls:
             print("✗ 未找到视频 URL")

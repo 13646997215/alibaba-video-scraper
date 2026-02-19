@@ -85,6 +85,20 @@ def scrape():
     except (TypeError, ValueError, AttributeError):
         page_title = ""
 
+    if scraper.detect_anti_bot_page(html):
+        return jsonify(
+            {
+                "status": "error",
+                "error": "目标站触发反爬校验页（Captcha/Punish），当前请求环境无法直接提取视频。",
+                "code": "ANTI_BOT_BLOCKED",
+                "tips": [
+                    "请稍后重试，或更换网络出口",
+                    "可先用全资源模式确认页面是否仅返回校验内容",
+                    "若 Vercel 失败但浏览器可看视频，通常是机房 IP 被风控",
+                ],
+            }
+        ), 423
+
     scraper.extract_videos_from_html(html)
     videos = []
     for item in scraper.video_urls:

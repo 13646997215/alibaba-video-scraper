@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>使用帮助 - Alibaba Video Scraper</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="container">
+        <header class="hero-card">
+          <div class="hero-badge">帮助中心</div>
+          <h1>📘 使用帮助与故障排查</h1>
+          <p>针对 Vercel / 本地差异、反爬限制、导出与筛选提供完整指南。</p>
+          <div class="hero-tools">
+            <a class="btn btn-soft nav-link" href="index.html">返回主页面</a>
+            <a class="btn btn-soft nav-link" href="diagnostics.html">打开诊断中心</a>
+          </div>
+        </header>
+
+        <section class="card">
+          <h2 class="status-text">快速结论</h2>
+          <p class="helper-text">
+            如果 <strong>health 正常</strong> 但 <strong>scrape 失败</strong>，通常是目标站返回了反爬校验页（Captcha/Punish），不是你的前端或 API 路由坏掉。
+          </p>
+        </section>
+
+        <section class="card">
+          <h2 class="status-text">建议排查顺序</h2>
+          <ol class="help-list">
+            <li>在“诊断中心”运行全量诊断，查看 diag/scrape/extract 返回。</li>
+            <li>若出现 <code>ANTI_BOT_BLOCKED</code>，说明被目标站风控。</li>
+            <li>尝试更换商品链接、降低请求频率、稍后再试。</li>
+            <li>优先使用“全资源模式”判断是否仍可提取图片等资源。</li>
+            <li>将诊断结果复制给维护者进一步分析。</li>
+          </ol>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

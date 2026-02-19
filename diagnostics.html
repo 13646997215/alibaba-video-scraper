@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>诊断中心 - Alibaba Video Scraper</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="container">
+        <header class="hero-card">
+          <div class="hero-badge">诊断工具</div>
+          <h1>🧪 API 诊断中心</h1>
+          <p>一键检查 health / diag / scrape / extract，定位线上失败原因。</p>
+          <div class="hero-tools">
+            <a class="btn btn-soft nav-link" href="index.html">返回主页面</a>
+            <a class="btn btn-soft nav-link" href="help.html">查看帮助</a>
+          </div>
+        </header>
+
+        <section class="card">
+          <label class="field-label" for="diagApiBase">API Base</label>
+          <input id="diagApiBase" class="filter-input" type="text" value="/api" />
+          <label class="field-label" for="diagUrl">测试链接</label>
+          <input
+            id="diagUrl"
+            class="url-input"
+            type="text"
+            value="https://www.alibaba.com/product-detail/Custom-Wholesale-Metal-Rimless-Sunglasses-with_1601426961544.html?spm=a2700.product_home_fy25.just_for_you.15.2ce26e58c8Uu5k"
+          />
+          <div class="quick-actions">
+            <button id="runDiagBtn" class="btn btn-primary" type="button">运行全量诊断</button>
+            <button id="copyDiagBtn" class="btn btn-soft" type="button">复制诊断结果</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="status-text">诊断结果</div>
+          <pre id="diagOutput" class="diag-output">等待执行...</pre>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const runDiagBtn = document.getElementById('runDiagBtn');
+      const copyDiagBtn = document.getElementById('copyDiagBtn');
+      const diagOutput = document.getElementById('diagOutput');
+      const diagApiBase = document.getElementById('diagApiBase');
+      const diagUrl = document.getElementById('diagUrl');
+
+      function normalizeBase(base) {
+        const value = (base || '/api').trim();
+        if (!value) return '/api';
+        return value.endsWith('/') ? value.slice(0, -1) : value;
+      }
+
+      async function requestJson(url, options = {}) {
+        const response = await fetch(url, options);
+        const data = await response.json().catch(() => ({}));
+        return { ok: response.ok, status: response.status, data };
+      }
+
+      function append(line) {
+        diagOutput.textContent += `\n${line}`;
+      }
+
+      runDiagBtn.addEventListener('click', async () => {
+        const base = normalizeBase(diagApiBase.value);
+        const target = diagUrl.value.trim();
+        if (!target) {
+          alert('请输入测试链接');
+          return;
+        }
+
+        diagOutput.textContent = '开始诊断...';
+        const checks = [
+          ['health', 'GET', `${base}/health`, null],
+          ['diag', 'POST', `${base}/diag`, { url: target }],
+          ['scrape', 'POST', `${base}/scrape`, { url: target }],
+          ['extract', 'POST', `${base}/extract`, { url: target }],
+        ];
+
+        const result = { started_at: new Date().toISOString(), checks: {} };
+
+        for (const [name, method, url, body] of checks) {
+          append(`\n--- ${name.toUpperCase()} ---`);
+          try {
+            const payload = await requestJson(url, {
+              method,
+              headers: body ? { 'Content-Type': 'application/json' } : undefined,
+              body: body ? JSON.stringify(body) : undefined,
+            });
+            result.checks[name] = payload;
+            append(`status=${payload.status} ok=${payload.ok}`);
+            append(JSON.stringify(payload.data, null, 2));
+          } catch (error) {
+            result.checks[name] = { ok: false, status: 0, error: String(error) };
+            append(`error: ${String(error)}`);
+          }
+        }
+
+        result.finished_at = new Date().toISOString();
+        window.__diagResult = result;
+      });
+
+      copyDiagBtn.addEventListener('click', async () => {
+        const text = window.__diagResult
+          ? JSON.stringify(window.__diagResult, null, 2)
+          : diagOutput.textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          alert('已复制诊断结果');
+        } catch {
+          alert('复制失败');
+        }
+      });
+    </script>
+  </body>
+</html>

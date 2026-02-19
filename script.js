@@ -63,7 +63,9 @@ const retryFailedBtn = document.getElementById("retryFailedBtn");
 const typeAllBtn = document.getElementById("typeAllBtn");
 const typeNoneBtn = document.getElementById("typeNoneBtn");
 const typeFilterPanel = document.getElementById("typeFilterPanel");
-const typeFilterCheckboxes = Array.from(document.querySelectorAll(".type-filter"));
+const typeFilterCheckboxes = Array.from(
+  document.querySelectorAll(".type-filter"),
+);
 const modeSelect = document.getElementById("modeSelect");
 const sortSelect = document.getElementById("sortSelect");
 const selectAllBtn = document.getElementById("selectAllBtn");
@@ -393,7 +395,9 @@ function loadUserPrefs() {
 function loadHistoryTabs() {
   let tabs = [];
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
+    const parsed = JSON.parse(
+      localStorage.getItem(STORAGE_HISTORY_KEY) || "[]",
+    );
     tabs = Array.isArray(parsed) ? parsed : [];
   } catch {
     tabs = [];
@@ -448,7 +452,10 @@ function persistHistoryTabs() {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     return new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime();
   });
-  localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(historyTabsData.slice(0, 80)));
+  localStorage.setItem(
+    STORAGE_HISTORY_KEY,
+    JSON.stringify(historyTabsData.slice(0, 80)),
+  );
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify(historyTabsData.slice(0, 8).map((item) => item.url)),
@@ -580,7 +587,9 @@ function importHistoryTabs(event) {
     try {
       const parsed = JSON.parse(String(reader.result || "[]"));
       const imported = sanitizeHistoryTabs(Array.isArray(parsed) ? parsed : []);
-      const mergedMap = new Map(historyTabsData.map((item) => [item.url, item]));
+      const mergedMap = new Map(
+        historyTabsData.map((item) => [item.url, item]),
+      );
       imported.forEach((item) => mergedMap.set(item.url, item));
       historyTabsData = [...mergedMap.values()];
       activeHistoryId = historyTabsData[0]?.id || "";
@@ -617,7 +626,9 @@ function createItem(url, type, index, name = "") {
 
 function isVisibleByFilter(item) {
   const enabledTypes = new Set(
-    typeFilterCheckboxes.filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value),
+    typeFilterCheckboxes
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value),
   );
   if (!enabledTypes.has(item.type)) return false;
 
@@ -846,7 +857,10 @@ async function scrapeUrls(urls) {
 
   for (let index = 0; index < urls.length; index += 1) {
     const url = urls[index];
-    const progress = Math.min(90, 20 + Math.round(((index + 1) / urls.length) * 70));
+    const progress = Math.min(
+      90,
+      20 + Math.round(((index + 1) / urls.length) * 70),
+    );
     updateStatus(
       "loading",
       "⏳",
@@ -935,7 +949,9 @@ async function retryFailedUrls() {
   scrapeBtn.disabled = true;
   try {
     const { merged, failed } = await scrapeUrls(lastFailedUrls);
-    const map = new Map(currentItems.map((item) => [`${item.type}::${item.url}`, item]));
+    const map = new Map(
+      currentItems.map((item) => [`${item.type}::${item.url}`, item]),
+    );
     merged.forEach((item) => map.set(`${item.type}::${item.url}`, item));
     currentItems = [...map.values()];
     lastFailedUrls = failed.map((item) => item.url);
@@ -1059,8 +1075,15 @@ function exportCsvReport() {
   }
   const rows = ["type,url,name,selected"];
   currentItems.forEach((item) => {
-    const values = [item.type, item.url, item.name || "", item.selected ? "1" : "0"];
-    rows.push(values.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","));
+    const values = [
+      item.type,
+      item.url,
+      item.name || "",
+      item.selected ? "1" : "0",
+    ];
+    rows.push(
+      values.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","),
+    );
   });
   const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
   downloadBlob(blob, "resource_links.csv");

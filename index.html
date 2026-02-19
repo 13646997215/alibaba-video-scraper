@@ -35,6 +35,8 @@
             <button id="checkApiBtn" class="btn btn-soft" type="button">
               检测 API
             </button>
+            <a class="btn btn-soft nav-link" href="diagnostics.html">诊断中心</a>
+            <a class="btn btn-soft nav-link" href="help.html">使用帮助</a>
           </div>
         </header>
 
@@ -42,21 +44,57 @@
           <div class="history-header">
             <h2>历史标签</h2>
             <div class="history-actions-inline">
-              <button id="clearHistoryBtn" class="btn btn-soft" type="button">清空历史</button>
-              <button id="exportHistoryBtn" class="btn btn-soft" type="button">导出历史</button>
-              <button id="importHistoryBtn" class="btn btn-soft" type="button">导入历史</button>
-              <input id="importHistoryInput" type="file" accept="application/json" hidden />
+              <button id="clearHistoryBtn" class="btn btn-soft" type="button">
+                清空历史
+              </button>
+              <button id="exportHistoryBtn" class="btn btn-soft" type="button">
+                导出历史
+              </button>
+              <button id="importHistoryBtn" class="btn btn-soft" type="button">
+                导入历史
+              </button>
+              <input
+                id="importHistoryInput"
+                type="file"
+                accept="application/json"
+                hidden
+              />
             </div>
           </div>
-          <input id="historySearchInput" class="filter-input" type="text" placeholder="搜索历史标签/链接/备注..." />
+          <input
+            id="historySearchInput"
+            class="filter-input"
+            type="text"
+            placeholder="搜索历史标签/链接/备注..."
+          />
           <div id="historyTabs" class="history-tabs"></div>
           <div class="history-editor">
-            <input id="historyLabelInput" class="filter-input" type="text" placeholder="标签名（可选）" />
-            <input id="historyNoteInput" class="filter-input" type="text" placeholder="备注（可选）" />
+            <input
+              id="historyLabelInput"
+              class="filter-input"
+              type="text"
+              placeholder="标签名（可选）"
+            />
+            <input
+              id="historyNoteInput"
+              class="filter-input"
+              type="text"
+              placeholder="备注（可选）"
+            />
             <div class="history-editor-actions">
-              <button id="saveHistoryMetaBtn" class="btn btn-soft" type="button">保存标签信息</button>
-              <button id="pinHistoryBtn" class="btn btn-soft" type="button">置顶/取消置顶</button>
-              <button id="deleteHistoryBtn" class="btn btn-soft" type="button">删除当前标签</button>
+              <button
+                id="saveHistoryMetaBtn"
+                class="btn btn-soft"
+                type="button"
+              >
+                保存标签信息
+              </button>
+              <button id="pinHistoryBtn" class="btn btn-soft" type="button">
+                置顶/取消置顶
+              </button>
+              <button id="deleteHistoryBtn" class="btn btn-soft" type="button">
+                删除当前标签
+              </button>
             </div>
           </div>
         </section>
@@ -82,9 +120,15 @@
             <button id="sampleUrlBtn" class="btn btn-soft" type="button">
               示例链接
             </button>
-            <button id="formatUrlsBtn" class="btn btn-soft" type="button">格式化去重</button>
-            <button id="copyInputBtn" class="btn btn-soft" type="button">复制输入</button>
-            <button id="removeInvalidBtn" class="btn btn-soft" type="button">移除无效链接</button>
+            <button id="formatUrlsBtn" class="btn btn-soft" type="button">
+              格式化去重
+            </button>
+            <button id="copyInputBtn" class="btn btn-soft" type="button">
+              复制输入
+            </button>
+            <button id="removeInvalidBtn" class="btn btn-soft" type="button">
+              移除无效链接
+            </button>
           </div>
           <p class="helper-text">
             支持阿里巴巴商品详情页，也支持多类资源网站链接。
@@ -131,14 +175,60 @@
               </select>
             </div>
             <div class="type-filter-panel" id="typeFilterPanel">
-              <label class="type-option"><input type="checkbox" class="type-filter" value="video" checked />视频</label>
-              <label class="type-option"><input type="checkbox" class="type-filter" value="image" checked />图片</label>
-              <label class="type-option"><input type="checkbox" class="type-filter" value="audio" checked />音频</label>
-              <label class="type-option"><input type="checkbox" class="type-filter" value="file" checked />文件</label>
-              <label class="type-option"><input type="checkbox" class="type-filter" value="folder" checked />文件夹</label>
-              <label class="type-option"><input type="checkbox" class="type-filter" value="other" checked />其他</label>
-              <button id="typeAllBtn" class="btn btn-soft" type="button">类型全选</button>
-              <button id="typeNoneBtn" class="btn btn-soft" type="button">类型清空</button>
+              <label class="type-option"
+                ><input
+                  type="checkbox"
+                  class="type-filter"
+                  value="video"
+                  checked
+                />视频</label
+              >
+              <label class="type-option"
+                ><input
+                  type="checkbox"
+                  class="type-filter"
+                  value="image"
+                  checked
+                />图片</label
+              >
+              <label class="type-option"
+                ><input
+                  type="checkbox"
+                  class="type-filter"
+                  value="audio"
+                  checked
+                />音频</label
+              >
+              <label class="type-option"
+                ><input
+                  type="checkbox"
+                  class="type-filter"
+                  value="file"
+                  checked
+                />文件</label
+              >
+              <label class="type-option"
+                ><input
+                  type="checkbox"
+                  class="type-filter"
+                  value="folder"
+                  checked
+                />文件夹</label
+              >
+              <label class="type-option"
+                ><input
+                  type="checkbox"
+                  class="type-filter"
+                  value="other"
+                  checked
+                />其他</label
+              >
+              <button id="typeAllBtn" class="btn btn-soft" type="button">
+                类型全选
+              </button>
+              <button id="typeNoneBtn" class="btn btn-soft" type="button">
+                类型清空
+              </button>
             </div>
             <input
               id="filterInput"
@@ -147,13 +237,38 @@
               placeholder="筛选链接关键字..."
             />
             <div class="tool-row">
-              <input id="domainFilterInput" class="filter-input" type="text" placeholder="按域名筛选，例如 alibaba.com" />
-              <input id="maxResultsInput" class="filter-input" type="number" min="0" step="1" placeholder="展示上限（0=不限）" />
+              <input
+                id="domainFilterInput"
+                class="filter-input"
+                type="text"
+                placeholder="按域名筛选，例如 alibaba.com"
+              />
+              <input
+                id="maxResultsInput"
+                class="filter-input"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="展示上限（0=不限）"
+              />
             </div>
             <div class="toggle-row">
-              <label class="type-option"><input id="selectedOnlyToggle" type="checkbox" />仅显示已勾选</label>
-              <label class="type-option"><input id="dedupeToggle" type="checkbox" checked />解析时去重</label>
-              <button id="retryFailedBtn" class="btn btn-soft" type="button">重试失败链接</button>
+              <label class="type-option"
+                ><input
+                  id="selectedOnlyToggle"
+                  type="checkbox"
+                />仅显示已勾选</label
+              >
+              <label class="type-option"
+                ><input
+                  id="dedupeToggle"
+                  type="checkbox"
+                  checked
+                />解析时去重</label
+              >
+              <button id="retryFailedBtn" class="btn btn-soft" type="button">
+                重试失败链接
+              </button>
             </div>
             <div class="tool-buttons">
               <button id="selectAllBtn" class="btn btn-soft" type="button">
@@ -171,15 +286,21 @@
               <button id="copySelectedBtn" class="btn btn-soft" type="button">
                 复制所选
               </button>
-              <button id="copyFailedBtn" class="btn btn-soft" type="button">复制失败链接</button>
-              <button id="openSelectedBtn" class="btn btn-soft" type="button">打开所选</button>
+              <button id="copyFailedBtn" class="btn btn-soft" type="button">
+                复制失败链接
+              </button>
+              <button id="openSelectedBtn" class="btn btn-soft" type="button">
+                打开所选
+              </button>
               <button id="exportJsonBtn" class="btn btn-soft" type="button">
                 导出JSON
               </button>
               <button id="exportTxtBtn" class="btn btn-soft" type="button">
                 导出TXT
               </button>
-              <button id="exportCsvBtn" class="btn btn-soft" type="button">导出CSV</button>
+              <button id="exportCsvBtn" class="btn btn-soft" type="button">
+                导出CSV
+              </button>
               <button
                 id="downloadSelectedBtn"
                 class="btn btn-soft"

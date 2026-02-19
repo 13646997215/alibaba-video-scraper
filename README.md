@@ -114,7 +114,7 @@ git push -u origin main
 
 本项目已经使用最稳的重写配置：
 
-- /api/* -> /api/index.py
+- /api/\* -> /api/index.py
 - 静态文件由 Vercel 自动托管
 
 ### 错误 B：页面打开了，但点击开始爬取报错
@@ -122,6 +122,10 @@ git push -u origin main
 先访问：
 
 - https://你的域名.vercel.app/api/health
+
+如果你开启了自定义重写且路径前缀被改写，再访问：
+
+- https://你的域名.vercel.app/health
 
 如果不通，说明后端函数未正常部署；重新部署并检查 requirements.txt。
 

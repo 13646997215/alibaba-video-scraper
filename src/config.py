@@ -1,14 +1,24 @@
-import os
 from pathlib import Path
 
 # 项目根目录
 BASE_DIR = Path(__file__).parent.parent
 
-# 视频保存目录
-DOWNLOAD_DIR = BASE_DIR / "downloads"
+# 视频保存目录（Vercel 无服务器环境优先使用 /tmp）
+SERVERLESS_TMP_DIR = Path("/tmp/downloads")
+LOCAL_DOWNLOAD_DIR = BASE_DIR / "downloads"
 
-# 确保下载目录存在
-DOWNLOAD_DIR.mkdir(exist_ok=True)
+
+def _resolve_download_dir() -> Path:
+    for candidate in (SERVERLESS_TMP_DIR, LOCAL_DOWNLOAD_DIR):
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            return candidate
+        except OSError:
+            continue
+    return LOCAL_DOWNLOAD_DIR
+
+
+DOWNLOAD_DIR = _resolve_download_dir()
 
 # 浏览器配置
 BROWSER_TIMEOUT = 10  # 页面加载超时时间（秒）

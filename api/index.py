@@ -51,11 +51,13 @@ def _filename_from_url(video_url: str, index: int) -> str:
     return f"{index:02d}_{filename}"
 
 
+@app.get("/health")
 @app.get("/api/health")
 def health_check():
     return jsonify({"status": "ok", "message": "Alibaba Video Scraper API is running"})
 
 
+@app.post("/scrape")
 @app.post("/api/scrape")
 def scrape_videos():
     try:
@@ -92,6 +94,7 @@ def scrape_videos():
         return jsonify({"status": "error", "error": f"爬取失败: {str(error)}"}), 500
 
 
+@app.post("/package")
 @app.post("/api/package")
 def package_videos():
     try:

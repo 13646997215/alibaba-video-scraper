@@ -1,158 +1,129 @@
-# 阿里巴巴商品视频爬虫工具（Vercel 一键在线版）
+# 阿里巴巴商品视频爬虫（最终稳定版）
 
-这是一个已经做成在线网页的项目。
+这个项目已经重构为：
 
-## 你最终会得到什么
+- 前端静态页面（`index.html`、`script.js`、`style.css`）
+- Vercel 原生文件路由 API（`api/health.py`、`api/scrape.py`、`api/package.py`）
 
-- 一个可公开访问的网址
-- 任何人打开网址就能使用
-- 访客不需要安装 Python、Node.js、插件或任何环境
+目标：**访客只需打开你的网站网址即可直接使用，无需安装任何环境。**
 
 ---
 
-## 先确认：访客怎么用
+## 一、访客怎么用（零安装）
 
-访客只做这 5 步：
+访客只需要：
 
 1. 打开你的网站网址
 2. 粘贴阿里巴巴商品链接
 3. 点击「开始爬取」
-4. 等待解析完成
-5. 点击「打包下载全部」
+4. 点击「打包下载全部」
 
-到这里，访客全程都不需要安装任何软件。
-
----
-
-## 项目结构（给仓库维护者）
-
-- api/index.py：后端 API（Vercel Python Function）
-- src/scraper.py：页面抓取与视频提取逻辑
-- index.html：前端页面
-- style.css：前端样式
-- script.js：前端交互
-- vercel.json：Vercel 路由重写配置
-- requirements.txt：Python 依赖
+到这里结束，访客不需要安装 Python、Node.js 或插件。
 
 ---
 
-## 保姆级部署教程（确保 100% 可跑）
+## 二、仓库维护者保姆级部署教程（Vercel）
 
-### 第 0 步：准备账号
-
-你需要：
-
-- GitHub 账号
-- Vercel 账号（可直接用 GitHub 登录）
-
-### 第 1 步：把代码放到 GitHub
-
-在本地项目目录执行：
+### 第 1 步：上传代码到 GitHub
 
 ```bash
-git init
 git add .
-git commit -m "feat: deploy-ready alibaba video scraper"
-git branch -M main
-git remote add origin 你的仓库地址
-git push -u origin main
+git commit -m "feat: stable vercel file-routed api"
+git push origin main
 ```
 
 ### 第 2 步：在 Vercel 导入仓库
 
 1. 打开 Vercel 控制台
-2. 点击 New Project
-3. 选择你的 GitHub 仓库
-4. 点击 Import
+2. New Project
+3. 选择该 GitHub 仓库
+4. Import
 
-### 第 3 步：部署参数要这样填（重点）
+### 第 3 步：部署设置（关键）
 
-在 Project Settings / Build and Output Settings 中确认：
-
-- Framework Preset：Other
-- Root Directory：.（项目根目录）
+- Framework Preset：`Other`
+- Root Directory：`.`（项目根目录）
 - Build Command：留空
 - Output Directory：留空
-- Install Command：留空（Vercel 会按 Python 项目自动处理）
+- Install Command：留空
 
 然后点击 Deploy。
 
-### 第 4 步：部署成功后立即自检
+### 第 4 步：部署后 30 秒验证
 
-打开线上网址，验证以下接口：
+按顺序访问：
 
-- 首页：
-  - https://你的域名.vercel.app/
-- 健康检查：
-  - https://你的域名.vercel.app/api/health
+1. 首页：
+   - `https://你的域名.vercel.app/`
+2. 健康接口：
+   - `https://你的域名.vercel.app/api/health`
 
-如果健康检查返回 status=ok，说明后端正常。
+如果第 2 步返回 JSON：
+
+```json
+{"status":"ok","message":"Alibaba Video Scraper API is running"}
+```
+
+说明后端已正常在线，访客可直接使用。
 
 ---
 
-## 常见错误与对应修复
+## 三、这次为啥能比之前稳定
 
-### 错误 A：线上打开就是 404（你截图中的问题）
+本次已做以下架构调整：
 
-现象：
+1. 去掉单 Flask 入口 + 重写依赖路径，改用 Vercel 文件路由 API
+2. 去掉高风险 `vercel.json` 重写配置，交给 Vercel 默认静态托管
+3. API 拆分为独立函数，互不影响：
+   - `api/health.py`
+   - `api/scrape.py`
+   - `api/package.py`
+4. 补上 `api/__init__.py`，避免包导入异常
+5. 下载目录改为 serverless 兼容（优先 `/tmp`）
 
-- 访问 / 返回 404
-- 日志中出现 /index.html 404
+---
 
-原因通常是：
+## 四、常见故障排查（必看）
 
-- Vercel 项目导入时选错了 Root Directory
-- 旧部署缓存未更新
-- vercel.json 路由写法不兼容
+### 场景 A：`/api/health` 返回 500
 
-修复步骤：
+请在 Vercel 项目中查看该次部署的 Function Logs，重点看：
 
-1. 进入 Vercel 项目 Settings
-2. 把 Root Directory 改为项目根目录（.）
-3. 点击 Redeploy（建议勾选清除缓存）
-4. 确认仓库中存在 index.html 且在根目录
+- `ModuleNotFoundError`
+- `ImportError`
+- `SyntaxError`
 
-本项目已经使用最稳的重写配置：
+如果有日志，把完整报错贴出来即可继续精准修复。
 
-- /api/\* -> /api/index.py
-- 静态文件由 Vercel 自动托管
+### 场景 B：`/api/health` 返回 404
 
-### 错误 B：页面打开了，但点击开始爬取报错
+通常是项目导入目录不对：
 
-先访问：
+- 确认 Root Directory 是 `.`
+- 确认仓库中存在 `api/health.py`
+- 点击 Redeploy（清缓存）
 
-- https://你的域名.vercel.app/api/health
+### 场景 C：页面能开但点击按钮报接口不可达
 
-如果你开启了自定义重写且路径前缀被改写，再访问：
+- 打开浏览器控制台看请求 URL
+- 正常线上应请求：`/api/scrape`
+- 再手动访问：`https://你的域名.vercel.app/api/health`
 
-- https://你的域名.vercel.app/health
+---
 
-如果不通，说明后端函数未正常部署；重新部署并检查 requirements.txt。
+## 五、本地调试（开发者可选）
 
-### 错误 C：本地打开 index.html 报 Failed to fetch
-
-这是本地调试问题，不影响线上访客。
-
-本地调试请先启动 API：
+仅开发者需要，访客不需要。
 
 ```bash
+pip install -r requirements.txt
 python run_local_api.py
 ```
 
-然后再打开页面。
+然后打开 `index.html` 或本地静态服务测试。
 
 ---
 
-## 线上质量检查清单（部署后 1 分钟完成）
+## 六、合规说明
 
-- [ ] 打开首页不报 404
-- [ ] /api/health 返回正常 JSON
-- [ ] 输入真实商品链接可解析视频
-- [ ] 「打包下载全部」可下载 ZIP
-- [ ] 手机端可正常使用
-
----
-
-## 声明
-
-本工具仅用于学习与技术研究。请遵守目标网站使用条款及当地法律法规，不要用于侵权或非法用途。
+本工具仅用于学习与技术研究，请遵守目标网站条款与当地法律法规，不要用于侵权用途。

@@ -1,4 +1,18 @@
-const API_BASE = "/api";
+function resolveApiBase() {
+  const params = new URLSearchParams(window.location.search);
+  const customApi = params.get("api");
+  if (customApi) {
+    return customApi.replace(/\/$/, "");
+  }
+
+  if (window.location.protocol === "file:") {
+    return "http://127.0.0.1:5000/api";
+  }
+
+  return "/api";
+}
+
+const API_BASE = resolveApiBase();
 
 const urlInput = document.getElementById("urlInput");
 const scrapeBtn = document.getElementById("scrapeBtn");
@@ -11,6 +25,7 @@ const videosSection = document.getElementById("videosSection");
 const videosList = document.getElementById("videosList");
 const downloadAllBtn = document.getElementById("downloadAllBtn");
 const videoCountPill = document.getElementById("videoCountPill");
+const runtimeHint = document.getElementById("runtimeHint");
 
 let currentVideos = [];
 
@@ -21,6 +36,8 @@ urlInput.addEventListener("keypress", (event) => {
     handleScrape();
   }
 });
+
+bootstrapRuntimeDiagnostics();
 
 function showToast(message) {
   window.alert(message);
@@ -116,7 +133,13 @@ function renderVideos(videos) {
 }
 
 async function requestJson(url, options) {
-  const response = await fetch(url, options);
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch {
+    throw new Error(getNetworkErrorMessage());
+  }
+
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
@@ -125,6 +148,30 @@ async function requestJson(url, options) {
   }
 
   return data;
+}
+
+function getNetworkErrorMessage() {
+  if (window.location.protocol === "file:") {
+    return `接口不可达。请先启动本地 API：${API_BASE}/health`;
+  }
+  return "接口不可达，请检查网络或后端服务状态";
+}
+
+async function bootstrapRuntimeDiagnostics() {
+  if (!runtimeHint) {
+    return;
+  }
+
+  const envLabel =
+    window.location.protocol === "file:" ? "本地文件模式" : "网页模式";
+  runtimeHint.textContent = ` 当前模式：${envLabel} · API：${API_BASE}`;
+
+  try {
+    await requestJson(`${API_BASE}/health`, { method: "GET" });
+    runtimeHint.textContent += " · 连接正常 ✓";
+  } catch {
+    runtimeHint.textContent += " · API 未连接";
+  }
 }
 
 async function handleScrape() {
@@ -145,7 +192,13 @@ async function handleScrape() {
   setSectionVisible(downloadAllBtn, false);
   currentVideos = [];
 
-  updateStatus("loading", "⏳", "正在爬取", "正在抓取并解析页面视频资源...", 28);
+  updateStatus(
+    "loading",
+    "⏳",
+    "正在爬取",
+    "正在抓取并解析页面视频资源...",
+    28,
+  );
 
   try {
     const data = await requestJson(`${API_BASE}/scrape`, {
@@ -182,7 +235,13 @@ async function handlePackageDownload() {
 
   downloadAllBtn.disabled = true;
   downloadAllBtn.textContent = "⏳ 正在打包...";
-  updateStatus("loading", "⏳", "正在打包", "服务器正在下载并压缩视频，请稍候...", 60);
+  updateStatus(
+    "loading",
+    "⏳",
+    "正在打包",
+    "服务器正在下载并压缩视频，请稍候...",
+    60,
+  );
 
   try {
     const data = await requestJson(`${API_BASE}/package`, {
@@ -204,7 +263,13 @@ async function handlePackageDownload() {
     link.click();
     document.body.removeChild(link);
 
-    updateStatus("success", "✓", "打包完成", data.message || "压缩包下载已开始", 100);
+    updateStatus(
+      "success",
+      "✓",
+      "打包完成",
+      data.message || "压缩包下载已开始",
+      100,
+    );
     showToast("✓ ZIP 下载已开始，请查看浏览器下载列表");
   } catch (error) {
     updateStatus("error", "✗", "打包失败", error.message, 0);

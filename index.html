@@ -137,6 +137,26 @@
           </p>
         </section>
 
+        <section class="card" id="browserAssistCard">
+          <div class="videos-header" style="margin-bottom: 10px; padding-bottom: 10px">
+            <h2>浏览器辅助解析</h2>
+            <span class="count-pill">无需后端抓取</span>
+          </div>
+          <p class="helper-text">
+            当线上接口提示 <strong>ANTI_BOT_BLOCKED</strong> 时，可在浏览器打开商品页，按 <strong>Ctrl+U</strong> 查看源代码并全选复制，粘贴到下方即可解析。
+          </p>
+          <textarea
+            id="htmlPasteInput"
+            class="filter-input"
+            rows="6"
+            placeholder="在这里粘贴商品页 HTML 源代码（Ctrl+A 全选 -> Ctrl+C 复制）..."
+          ></textarea>
+          <div class="quick-actions" style="margin-top: 10px">
+            <button id="parseHtmlBtn" class="btn btn-primary" type="button">解析粘贴的 HTML</button>
+            <button id="clearHtmlBtn" class="btn btn-soft" type="button">清空 HTML</button>
+          </div>
+        </section>
+
         <section class="card status-section" id="statusSection" hidden>
           <div class="status-header">
             <span class="status-icon" id="statusIcon">⏳</span>

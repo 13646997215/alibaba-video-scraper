@@ -440,6 +440,13 @@ body {
   color: var(--text-primary);
 }
 
+textarea.filter-input {
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  line-height: 1.5;
+}
+
 .tool-buttons {
   display: flex;
   flex-wrap: wrap;

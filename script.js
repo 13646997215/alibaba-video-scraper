@@ -29,6 +29,9 @@ const removeInvalidBtn = document.getElementById("removeInvalidBtn");
 const themeSelect = document.getElementById("themeSelect");
 const checkApiBtn = document.getElementById("checkApiBtn");
 const inputMeta = document.getElementById("inputMeta");
+const htmlPasteInput = document.getElementById("htmlPasteInput");
+const parseHtmlBtn = document.getElementById("parseHtmlBtn");
+const clearHtmlBtn = document.getElementById("clearHtmlBtn");
 
 const historyTabs = document.getElementById("historyTabs");
 const historySearchInput = document.getElementById("historySearchInput");
@@ -148,6 +151,31 @@ removeInvalidBtn.addEventListener("click", () => {
   urlInput.value = [...new Set(valid)].join("\n");
   updateInputMeta();
   showToast(`✓ 已保留 ${valid.length} 个有效链接`);
+});
+
+parseHtmlBtn.addEventListener("click", () => {
+  const html = (htmlPasteInput.value || "").trim();
+  if (!html) {
+    showToast("请先粘贴 HTML 源代码");
+    return;
+  }
+  currentItems = parseResourcesFromHtml(html);
+  lastSummary = {
+    time: new Date().toLocaleString(),
+    title: "browser-assisted",
+    counts: {},
+  };
+  renderItems();
+  if (!currentItems.length) {
+    updateStatus("error", "⚠", "未找到资源", "HTML 中未匹配到可识别的资源链接", 100);
+    return;
+  }
+  updateStatus("success", "✓", "解析完成", `从 HTML 提取到 ${currentItems.length} 个资源`, 100);
+});
+
+clearHtmlBtn.addEventListener("click", () => {
+  htmlPasteInput.value = "";
+  showToast("✓ 已清空");
 });
 
 themeSelect.addEventListener("change", () => {
@@ -622,6 +650,61 @@ function createItem(url, type, index, name = "") {
     name,
     selected: true,
   };
+}
+
+function parseResourcesFromHtml(html) {
+  const text = String(html || "");
+  const items = [];
+  const seen = new Set();
+  let index = 0;
+
+  const candidates = [];
+  const patterns = [
+    /https?:\/\/[^\s"'<>]+\.(?:mp4|webm|ogg|mov|m3u8)(?:\?[^\s"'<>]*)?/gi,
+    /"videoUrl"\s*:\s*"([^"]+)"/gi,
+    /"playUrl"\s*:\s*"([^"]+)"/gi,
+    /"previewVideoUrl"\s*:\s*"([^"]+)"/gi,
+    /"mediaUrl"\s*:\s*"([^"]+)"/gi,
+    /https?:\\\/\\\/[^\s"'<>]+\.(?:mp4|webm|ogg|mov|m3u8)(?:\?[^\s"'<>]*)?/gi,
+    /\\"videoUrl\\"\s*:\s*\\"([^\\"]+)\\"/gi,
+  ];
+
+  patterns.forEach((pattern) => {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const value = match[1] || match[0];
+      candidates.push(value);
+    }
+  });
+
+  const urlPattern = /https?:\/\/[^\s"'<>]+/gi;
+  let urlMatch;
+  while ((urlMatch = urlPattern.exec(text)) !== null) {
+    candidates.push(urlMatch[0]);
+  }
+
+  candidates.forEach((raw) => {
+    const normalized = String(raw)
+      .replace(/\\u002F/gi, "/")
+      .replace(/\\\//g, "/")
+      .trim();
+    if (!normalized.startsWith("http")) return;
+
+    const lower = normalized.toLowerCase();
+    let type = "other";
+    if (/(\.mp4|\.webm|\.ogg|\.mov|\.m3u8)(\?|$)/.test(lower)) type = "video";
+    else if (/(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.svg|\.avif)(\?|$)/.test(lower)) type = "image";
+    else if (/(\.mp3|\.wav|\.m4a|\.aac|\.flac)(\?|$)/.test(lower)) type = "audio";
+    else if (/(\.pdf|\.docx?|\.xlsx?|\.pptx?|\.zip|\.rar|\.7z|\.csv|\.json|\.txt)(\?|$)/.test(lower)) type = "file";
+
+    const key = `${type}::${normalized}`;
+    if (dedupeToggle.checked && seen.has(key)) return;
+    seen.add(key);
+    items.push(createItem(normalized, type, index, ""));
+    index += 1;
+  });
+
+  return items;
 }
 
 function isVisibleByFilter(item) {

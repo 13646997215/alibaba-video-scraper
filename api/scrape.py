@@ -12,6 +12,7 @@ from api._common import read_json_body, send_json, set_cors_headers
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.scraper import AlibabaVideoScraper
+from src.resource_extractor import extract_resources_from_html
 
 
 def normalize_input_url(url: str) -> str:
@@ -72,6 +73,10 @@ class handler(BaseHTTPRequestHandler):
                 normalized = normalize_video_url(item, page_url)
                 if normalized.startswith("http") and normalized not in videos:
                     videos.append(normalized)
+
+            if not videos:
+                extracted = extract_resources_from_html(html, page_url)
+                videos = [item["url"] for item in extracted.get("videos", [])]
 
             if not videos:
                 send_json(

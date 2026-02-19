@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 import requests
 from flask import Flask, jsonify, request
 
+from src.resource_extractor import extract_resources_from_html
 from src.scraper import AlibabaVideoScraper
 
 app = Flask(__name__)
@@ -115,6 +116,31 @@ def package():
             "total_count": len(videos),
         }
     )
+
+
+@app.post("/api/extract")
+def extract_resources():
+    payload = request.get_json(silent=True) or {}
+    page_url = normalize_input_url(payload.get("url", ""))
+    if not page_url:
+        return jsonify({"status": "error", "error": "URL 不能为空"}), 400
+
+    try:
+        response = requests.get(page_url, timeout=30)
+        response.raise_for_status()
+        resources = extract_resources_from_html(response.text, response.url or page_url)
+        counts = {key: len(value) for key, value in resources.items()}
+        return jsonify(
+            {
+                "status": "success",
+                "message": "资源提取完成",
+                "resources": resources,
+                "counts": counts,
+                "total": sum(counts.values()),
+            }
+        )
+    except requests.RequestException as error:
+        return jsonify({"status": "error", "error": f"提取失败: {str(error)}"}), 500
 
 
 if __name__ == "__main__":

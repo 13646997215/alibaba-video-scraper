@@ -241,6 +241,12 @@ body {
   margin-bottom: 10px;
 }
 
+.tool-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .filter-input {
   width: 100%;
   border: 1px solid rgba(164, 181, 213, 0.5);
@@ -259,6 +265,16 @@ body {
   margin-bottom: 10px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.type-pill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  background: rgba(164, 181, 213, 0.2);
+  color: #63708d;
+  margin-left: 6px;
 }
 
 .video-item.selected {
@@ -286,6 +302,10 @@ body {
   place-items: center;
   z-index: 30;
   padding: 16px;
+}
+
+.preview-modal[hidden] {
+  display: none !important;
 }
 
 .preview-panel {
@@ -482,6 +502,10 @@ body {
 }
 
 @media (max-width: 560px) {
+  .tool-row {
+    grid-template-columns: 1fr;
+  }
+
   .video-item {
     flex-direction: column;
     align-items: flex-start;

@@ -40,7 +40,7 @@ class AlibabaVideoScraper:
     def fetch_page(self, url):
         print(f"正在获取页面: {url}")
         try:
-            response = self.session.get(url, timeout=REQUEST_TIMEOUT)
+            response = self._safe_get(url, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             response.encoding = "utf-8"
             print("✓ 页面获取成功")
@@ -48,6 +48,13 @@ class AlibabaVideoScraper:
         except requests.RequestException as error:
             print(f"✗ 页面获取失败: {error}")
             return None
+
+    def _safe_get(self, url, **kwargs):
+        try:
+            return self.session.get(url, **kwargs)
+        except requests.exceptions.SSLError:
+            print("! 证书校验失败，已切换兼容模式重试")
+            return self.session.get(url, verify=False, **kwargs)
 
     def extract_videos_from_html(self, html):
         print("正在提取视频 URL...")
@@ -118,7 +125,7 @@ class AlibabaVideoScraper:
     def download_video(self, video_url, filename):
         try:
             print(f"\n正在下载: {filename}")
-            response = self.session.get(video_url, timeout=REQUEST_TIMEOUT, stream=True)
+            response = self._safe_get(video_url, timeout=REQUEST_TIMEOUT, stream=True)
             response.raise_for_status()
 
             total_size = int(response.headers.get("content-length", 0))

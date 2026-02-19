@@ -5,12 +5,31 @@ import zipfile
 from urllib.parse import urljoin
 
 import requests
+from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 
 from src.resource_extractor import extract_resources_from_html
 from src.scraper import AlibabaVideoScraper
 
 app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+
+@app.after_request
+def add_common_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    return response
+
+
+def safe_requests_get(url: str, **kwargs):
+    timeout = kwargs.pop("timeout", 30)
+    try:
+        return requests.get(url, timeout=timeout, **kwargs)
+    except requests.exceptions.SSLError:
+        return requests.get(url, timeout=timeout, verify=False, **kwargs)
 
 
 def normalize_input_url(url: str) -> str:
@@ -59,6 +78,13 @@ def scrape():
     if not html:
         return jsonify({"status": "error", "error": "页面获取失败，请检查链接是否可访问"}), 400
 
+    page_title = ""
+    try:
+        title_node = BeautifulSoup(html, "html.parser").title
+        page_title = title_node.get_text(strip=True) if title_node else ""
+    except (TypeError, ValueError, AttributeError):
+        page_title = ""
+
     scraper.extract_videos_from_html(html)
     videos = []
     for item in scraper.video_urls:
@@ -67,7 +93,24 @@ def scrape():
             videos.append(normalized)
 
     if not videos:
-        return jsonify({"status": "error", "error": "未找到可下载视频，请尝试其他商品页"}), 404
+        resources = extract_resources_from_html(html, page_url)
+        videos = [item.get("url") for item in resources.get("videos", []) if isinstance(item, dict)]
+
+    if not videos:
+        return jsonify(
+            {
+                "status": "success",
+                "message": "页面已解析，但未找到可下载视频",
+                "videos": [],
+                "count": 0,
+                "page_title": page_title,
+                "tips": [
+                    "请确认链接是商品详情页，而不是搜索页或店铺首页",
+                    "请尝试更换其他商品链接",
+                    "部分商品视频可能由前端动态加密加载",
+                ],
+            }
+        )
 
     return jsonify(
         {
@@ -75,6 +118,7 @@ def scrape():
             "message": f"找到 {len(videos)} 个视频",
             "videos": videos,
             "count": len(videos),
+            "page_title": page_title,
         }
     )
 
@@ -94,7 +138,7 @@ def package():
             if not isinstance(video_url, str) or not video_url.startswith(("http://", "https://")):
                 continue
             try:
-                response = requests.get(video_url, timeout=30)
+                response = safe_requests_get(video_url, timeout=30)
                 response.raise_for_status()
                 zip_file.writestr(filename_from_url(video_url, index), response.content)
                 success_count += 1
@@ -126,7 +170,7 @@ def extract_resources():
         return jsonify({"status": "error", "error": "URL 不能为空"}), 400
 
     try:
-        response = requests.get(page_url, timeout=30)
+        response = safe_requests_get(page_url, timeout=30)
         response.raise_for_status()
         resources = extract_resources_from_html(response.text, response.url or page_url)
         counts = {key: len(value) for key, value in resources.items()}

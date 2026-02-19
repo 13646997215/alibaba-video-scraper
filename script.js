@@ -3,17 +3,24 @@ function resolveApiBase() {
   const customApi = params.get("api");
   if (customApi) return customApi.replace(/\/$/, "");
   if (window.location.protocol === "file:") return "http://127.0.0.1:5000/api";
+  const isLocalHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+  if (isLocalHost && window.location.port && window.location.port !== "5000") {
+    return "http://127.0.0.1:5000/api";
+  }
   return "/api";
 }
 
 let API_BASE = resolveApiBase();
 const STORAGE_KEY = "alibaba_video_scraper_recent_urls";
+const STORAGE_THEME_KEY = "alibaba_video_scraper_theme";
 
 const urlInput = document.getElementById("urlInput");
 const scrapeBtn = document.getElementById("scrapeBtn");
 const clearUrlBtn = document.getElementById("clearUrlBtn");
 const pasteUrlBtn = document.getElementById("pasteUrlBtn");
 const sampleUrlBtn = document.getElementById("sampleUrlBtn");
+const themeSelect = document.getElementById("themeSelect");
+const checkApiBtn = document.getElementById("checkApiBtn");
 
 const statusSection = document.getElementById("statusSection");
 const statusIcon = document.getElementById("statusIcon");
@@ -70,6 +77,14 @@ sampleUrlBtn.addEventListener("click", () => {
   urlInput.value = "https://www.alibaba.com/product-detail/Custom-Wholesale-Metal-Rimless-Sunglasses-wi_1601333000000.html";
 });
 
+themeSelect.addEventListener("change", () => {
+  applyTheme(themeSelect.value);
+});
+
+checkApiBtn.addEventListener("click", () => {
+  bootstrapRuntimeDiagnostics(true);
+});
+
 urlInput.addEventListener("keypress", (event) => {
   if (event.key === "Enter") handleScrape();
 });
@@ -115,6 +130,7 @@ previewModal.addEventListener("click", (event) => {
 });
 
 setSectionVisible(previewModal, false);
+initTheme();
 bootstrapRuntimeDiagnostics();
 renderRecentUrls();
 
@@ -124,6 +140,19 @@ function showToast(message) {
 
 function setSectionVisible(element, visible) {
   element.hidden = !visible;
+}
+
+function initTheme() {
+  const stored = localStorage.getItem(STORAGE_THEME_KEY) || "morandi";
+  const supported = ["morandi", "dark-pro", "ocean-mist"];
+  const finalTheme = supported.includes(stored) ? stored : "morandi";
+  themeSelect.value = finalTheme;
+  applyTheme(finalTheme, false);
+}
+
+function applyTheme(theme, persist = true) {
+  document.documentElement.setAttribute("data-theme", theme);
+  if (persist) localStorage.setItem(STORAGE_THEME_KEY, theme);
 }
 
 function updateStatus(type, icon, title, message, progress) {
@@ -142,6 +171,16 @@ function sanitizeUrl(value) {
   if (!raw) return "";
   if (/^https?:\/\//i.test(raw)) return raw;
   return `https://${raw}`;
+}
+
+function parseInputUrls(value) {
+  const raw = (value || "").trim();
+  if (!raw) return [];
+  const parts = raw.split(/[\n,;\s]+/).filter(Boolean);
+  const normalized = parts
+    .map((item) => sanitizeUrl(item))
+    .filter((item) => ensureValidUrl(item));
+  return [...new Set(normalized)];
 }
 
 function ensureValidUrl(url) {
@@ -315,13 +354,17 @@ function renderItems() {
   updateStats();
 }
 
-async function requestJson(url, options) {
+async function requestJson(url, options = {}, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
-    response = await fetch(url, options);
+    response = await fetch(url, { ...options, signal: controller.signal });
   } catch {
+    clearTimeout(timer);
     throw new Error("接口不可达，请检查网络或后端服务状态");
   }
+  clearTimeout(timer);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.error || data.message || "请求失败");
@@ -339,7 +382,7 @@ async function detectLocalFallback() {
   }
 }
 
-async function bootstrapRuntimeDiagnostics() {
+async function bootstrapRuntimeDiagnostics(showToastResult = false) {
   await detectLocalFallback();
   setSectionVisible(previewModal, false);
   const envLabel = window.location.protocol === "file:" ? "本地文件模式" : "网页模式";
@@ -347,8 +390,10 @@ async function bootstrapRuntimeDiagnostics() {
   try {
     await requestJson(`${API_BASE}/health`, { method: "GET" });
     runtimeHint.textContent += " · 连接正常 ✓";
+    if (showToastResult) showToast("✓ API 连接正常");
   } catch {
     runtimeHint.textContent += " · API 未连接";
+    if (showToastResult) showToast("✗ API 未连接，请先启动本地后端");
   }
 }
 
@@ -375,13 +420,24 @@ function mapExtractResources(data) {
   return items;
 }
 
+async function requestResources(url, mode) {
+  const endpoint = mode === "all" ? "/extract" : "/scrape";
+  const data = await requestJson(`${API_BASE}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  const items = mode === "all" ? mapExtractResources(data) : mapScrapeVideos(data);
+  return { data, items };
+}
+
 async function handleScrape() {
-  const url = sanitizeUrl(urlInput.value);
-  urlInput.value = url;
-  if (!url || !ensureValidUrl(url)) {
+  const urls = parseInputUrls(urlInput.value);
+  if (!urls.length) {
     showToast("请输入有效的 http/https 链接");
     return;
   }
+  urlInput.value = urls.join("\n");
 
   scrapeBtn.disabled = true;
   currentItems = [];
@@ -390,30 +446,51 @@ async function handleScrape() {
 
   try {
     const mode = modeSelect.value;
-    const endpoint = mode === "all" ? "/extract" : "/scrape";
-    const data = await requestJson(`${API_BASE}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
+    const merged = [];
+    const seen = new Set();
+    const failed = [];
+    let lastData = {};
 
-    saveRecentUrl(url);
-    currentItems = mode === "all" ? mapExtractResources(data) : mapScrapeVideos(data);
+    for (let index = 0; index < urls.length; index += 1) {
+      const url = urls[index];
+      const progress = Math.min(90, 20 + Math.round(((index + 1) / urls.length) * 70));
+      updateStatus("loading", "⏳", "正在解析", `正在处理第 ${index + 1}/${urls.length} 个链接...`, progress);
+      try {
+        const { data, items } = await requestResources(url, mode);
+        lastData = data;
+        saveRecentUrl(url);
+        items.forEach((item) => {
+          const key = `${item.type}::${item.url}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            merged.push(item);
+          }
+        });
+      } catch (error) {
+        failed.push(`${url}（${error.message}）`);
+      }
+    }
+
+    currentItems = merged;
 
     lastSummary = {
       time: new Date().toLocaleString(),
-      title: data.page_title || "",
-      counts: data.counts || {},
+      title: lastData.page_title || "",
+      counts: lastData.counts || {},
     };
 
     renderItems();
 
     if (currentItems.length === 0) {
-      updateStatus("error", "⚠", "未找到资源", data.message || "页面可访问但未提取到可下载资源", 100);
+      const message = failed.length
+        ? `全部链接处理失败（${failed.length}/${urls.length}），请检查网络或目标页面可访问性`
+        : "页面可访问但未提取到可下载资源";
+      updateStatus("error", "⚠", "未找到资源", message, 100);
       return;
     }
 
-    updateStatus("success", "✓", "解析完成", `找到 ${currentItems.length} 个资源`, 100);
+    const suffix = failed.length ? `（失败 ${failed.length} 个链接）` : "";
+    updateStatus("success", "✓", "解析完成", `找到 ${currentItems.length} 个资源${suffix}`, 100);
   } catch (error) {
     updateStatus("error", "✗", "解析失败", error.message, 0);
   } finally {
